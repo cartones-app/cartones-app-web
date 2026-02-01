@@ -2,7 +2,11 @@ import axios, { AxiosError } from 'axios';
 import { toast } from 'sonner';
 import { BackendErrorResponse } from '@/types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:9050';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+
+if (!API_BASE_URL) {
+    console.warn('NEXT_PUBLIC_API_URL is not defined in environment variables');
+}
 
 export const api = axios.create({
     baseURL: API_BASE_URL,
