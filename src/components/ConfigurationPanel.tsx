@@ -199,7 +199,7 @@ export function ConfigurationPanel({
                             <Input
                                 id="inicioSeneteGral"
                                 type="number"
-                                placeholder="Ej: 1000"
+                                placeholder="Por defecto empieza en 0"
                                 value={inicioSeneteGral}
                                 onChange={(e) => setInicioSeneteGral(e.target.value)}
                             />
@@ -212,7 +212,7 @@ export function ConfigurationPanel({
                             <Input
                                 id="inicioTelebingoGral"
                                 type="number"
-                                placeholder="Ej: 5000"
+                                placeholder="Por defecto empieza en 0"
                                 value={inicioTelebingoGral}
                                 onChange={(e) => setInicioTelebingoGral(e.target.value)}
                             />
@@ -396,8 +396,7 @@ export function ConfigurationPanel({
             <div className="min-h-[400px] pb-32">
                 {showResultsPreview ? (
                     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-lg font-medium">Resultados de la Simulación ({filteredResultados.length})</h3>
+                        <div className="flex items-center justify-end">
                             <Button
                                 onClick={() => setShowResultsPreview(false)}
                                 variant="outline"

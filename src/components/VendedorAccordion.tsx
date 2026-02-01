@@ -18,6 +18,12 @@ interface VendedorAccordionProps {
     onUpdateVendedor: (id: number, field: keyof VendedorInputDTO, value: number | null | undefined) => void;
 }
 
+const formatGuaranies = (valor: number | string | undefined | null) => {
+    if (valor === undefined || valor === null) return "Gs. 0";
+    const numero = Number(valor);
+    return `Gs. ${numero.toLocaleString('es-PY', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+};
+
 export function VendedorAccordion({
     vendedores,
     vendedorInputs,
@@ -42,7 +48,7 @@ export function VendedorAccordion({
                     </div>
                 ) : (
                     <Accordion type="single" collapsible className="space-y-2">
-                        {vendedores.map((vendedor) => {
+                        {vendedores.map((vendedor, index) => {
                             const input = getVendedorInput(vendedor.id);
                             return (
                                 <AccordionItem
@@ -54,7 +60,7 @@ export function VendedorAccordion({
                                         <div className="flex items-center justify-between w-full pr-4">
                                             <div className="flex items-center gap-4">
                                                 <span className="font-mono text-sm text-muted-foreground">
-                                                    #{vendedor.id}
+                                                    #{index + 1}
                                                 </span>
                                                 <span className="font-medium">{vendedor.nombre}</span>
                                             </div>
@@ -73,7 +79,7 @@ export function VendedorAccordion({
                                                     <div>
                                                         <span className="text-muted-foreground">Deuda:</span>
                                                         <span className="ml-2 font-medium">
-                                                            ${vendedor.deuda?.toFixed(2) ?? "0.00"}
+                                                            {formatGuaranies(vendedor.deuda)}
                                                         </span>
                                                     </div>
                                                     <div>

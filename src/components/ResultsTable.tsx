@@ -35,17 +35,17 @@ export function ResultsTable({ resultados }: ResultsTableProps) {
                         <Table>
                             <TableHeader>
                                 <TableRow className="bg-muted/50">
-                                    <TableHead className="w-[80px]">ID</TableHead>
+                                    <TableHead className="w-[80px]">#</TableHead>
                                     <TableHead>Nombre</TableHead>
                                     <TableHead>Rangos Seneté</TableHead>
                                     <TableHead>Rangos Telebingo</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {resultados.map((vendedor) => (
+                                {resultados.map((vendedor, index) => (
                                     <TableRow key={vendedor.id}>
                                         <TableCell className="font-mono text-muted-foreground">
-                                            #{vendedor.id}
+                                            {index + 1}
                                         </TableCell>
                                         <TableCell className="font-medium">{vendedor.nombre}</TableCell>
                                         <TableCell>

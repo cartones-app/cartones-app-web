@@ -40,7 +40,7 @@ export default function ConfiguracionPage() {
     const [fechaSorteoTelebingo, setFechaSorteoTelebingo] = useState<Date | undefined>(undefined);
     const [poolSenete, setPoolSenete] = useState<PoolRangeForm[]>([]);
     const [poolTelebingo, setPoolTelebingo] = useState<PoolRangeForm[]>([]);
-    const [mezclar, setMezclar] = useState(false);
+    const [mezclar, setMezclar] = useState(true);
     const [vendedorInputs, setVendedorInputs] = useState<VendedorInputDTO[]>([]);
     const [inicioSeneteGral, setInicioSeneteGral] = useState<string>("");
     const [inicioTelebingoGral, setInicioTelebingoGral] = useState<string>("");
