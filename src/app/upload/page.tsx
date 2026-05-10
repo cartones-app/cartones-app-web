@@ -10,7 +10,8 @@ import { useProcesoStore } from "@/store/useProcesoStore";
 import { uploadExcel } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RotateCcw, Sparkles } from "lucide-react";
+import { FileText, RotateCcw, Sparkles } from "lucide-react";
+import Link from "next/link";
 
 export default function UploadPage() {
     const router = useRouter();
@@ -73,6 +74,12 @@ export default function UploadPage() {
                             <h1 className="font-semibold text-lg">Gestión de Bingos</h1>
                         </div>
                         <div className="flex items-center gap-2">
+                            <Button variant="ghost" size="sm" asChild>
+                                <Link href="/mis-distribuciones">
+                                    <FileText className="h-4 w-4 mr-2" />
+                                    Mis distribuciones
+                                </Link>
+                            </Button>
                             <Button variant="ghost" size="sm" onClick={handleReset}>
                                 <RotateCcw className="h-4 w-4 mr-2" />
                                 Reiniciar
