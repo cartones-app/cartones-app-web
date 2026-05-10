@@ -9,6 +9,11 @@ if (!API_BASE_URL) {
     console.warn('NEXT_PUBLIC_API_URL is not defined in environment variables');
 }
 
+// Flag de modulo para dedup de re-login: si varias requests reciben 401 al
+// mismo tiempo, solo una dispara signIn() (el resto queda en flight hasta el
+// redirect).
+let reauthInFlight = false;
+
 export const api = axios.create({
     baseURL: API_BASE_URL,
     headers: {
@@ -23,6 +28,14 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
         return config;
     }
     const session = await getSession();
+    // Si el refresh silencioso del JWT callback falló, no enviamos un token rancio
+    // — disparamos re-login y dejamos que el flow corte el request en el 401.
+    if (session?.error === 'RefreshAccessTokenError' && !reauthInFlight) {
+        reauthInFlight = true;
+        void signIn('keycloak').finally(() => {
+            reauthInFlight = false;
+        });
+    }
     if (session?.accessToken) {
         config.headers.set('Authorization', `Bearer ${session.accessToken}`);
     }
@@ -49,12 +62,18 @@ api.interceptors.response.use(
         switch (status) {
             case 401:
                 // Sesión expirada o token inválido: forzar re-login.
-                toast.warning('Sesión expirada', {
-                    description: 'Por favor, iniciá sesión de nuevo.',
-                    duration: 4000,
-                });
-                if (typeof window !== 'undefined') {
-                    void signIn('keycloak');
+                // El flag previene multiples signIn() concurrentes si varias
+                // requests reciben 401 al mismo tiempo (toda la página se redirige
+                // una sola vez al endpoint de Keycloak).
+                if (typeof window !== 'undefined' && !reauthInFlight) {
+                    reauthInFlight = true;
+                    toast.warning('Sesión expirada', {
+                        description: 'Por favor, iniciá sesión de nuevo.',
+                        duration: 4000,
+                    });
+                    void signIn('keycloak').finally(() => {
+                        reauthInFlight = false;
+                    });
                 }
                 break;
 
