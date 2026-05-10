@@ -14,6 +14,18 @@ if (!API_BASE_URL) {
 // redirect).
 let reauthInFlight = false;
 
+function triggerReauth() {
+    if (reauthInFlight) return;
+    reauthInFlight = true;
+    // Envolvemos en Promise.resolve().then(...) por si signIn() lanza de forma
+    // sincrona — el .finally() corre igual y el flag no queda atascado.
+    Promise.resolve()
+        .then(() => signIn('keycloak'))
+        .finally(() => {
+            reauthInFlight = false;
+        });
+}
+
 export const api = axios.create({
     baseURL: API_BASE_URL,
     headers: {
@@ -29,12 +41,13 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
     }
     const session = await getSession();
     // Si el refresh silencioso del JWT callback falló, no enviamos un token rancio
-    // — disparamos re-login y dejamos que el flow corte el request en el 401.
-    if (session?.error === 'RefreshAccessTokenError' && !reauthInFlight) {
-        reauthInFlight = true;
-        void signIn('keycloak').finally(() => {
-            reauthInFlight = false;
-        });
+    // — disparamos re-login y abortamos esta request (el backend la rechazaría con
+    // 401 de todas formas).
+    if (session?.error === 'RefreshAccessTokenError') {
+        triggerReauth();
+        return Promise.reject(
+            new axios.Cancel('Sesión expirada — re-login en curso'),
+        );
     }
     if (session?.accessToken) {
         config.headers.set('Authorization', `Bearer ${session.accessToken}`);
@@ -61,19 +74,15 @@ api.interceptors.response.use(
 
         switch (status) {
             case 401:
-                // Sesión expirada o token inválido: forzar re-login.
-                // El flag previene multiples signIn() concurrentes si varias
-                // requests reciben 401 al mismo tiempo (toda la página se redirige
-                // una sola vez al endpoint de Keycloak).
+                // Sesión expirada o token inválido: forzar re-login. El flag dentro
+                // de triggerReauth() previene multiples signIn() concurrentes si
+                // varias requests reciben 401 al mismo tiempo.
                 if (typeof window !== 'undefined' && !reauthInFlight) {
-                    reauthInFlight = true;
                     toast.warning('Sesión expirada', {
                         description: 'Por favor, iniciá sesión de nuevo.',
                         duration: 4000,
                     });
-                    void signIn('keycloak').finally(() => {
-                        reauthInFlight = false;
-                    });
+                    triggerReauth();
                 }
                 break;
 
