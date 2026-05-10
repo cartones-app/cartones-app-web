@@ -1,0 +1,33 @@
+services:
+  frontend:
+    build:
+      context: .
+      args:
+        # NEXT_PUBLIC_* se bakea en el bundle al build. Lo pasamos como
+        # build-arg desde el .env (que el workflow genera leyendo Variables).
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    container_name: cartones_frontend
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+    # Sin "ports:" — entra por nginx-proxy en la network externa "proxy".
+    networks:
+      - proxy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/ || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+networks:
+  proxy:
+    # Network externa creada por ~/infra-claude/vps (nginx-proxy + cloudflared).
+    external: true

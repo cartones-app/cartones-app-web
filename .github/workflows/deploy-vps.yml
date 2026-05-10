@@ -1,0 +1,99 @@
+name: Deploy frontend to VPS (prod)
+
+# Despliega el frontend Next.js a la VPS personal cuando se pushea a master.
+# Mismo runner self-hosted que el backend (cartones-runner, [self-hosted, linux, arm64]).
+#
+# Topología:
+#   Internet → Cloudflare (rgq-cartones.eliasg.uk) → tunnel → nginx-proxy → cartones_frontend:3000
+# El frontend hace fetch a https://cartones.eliasg.uk (backend) — son CORS cross-origin
+# resueltos por APP_CORS_ORIGINS del backend.
+#
+# Variables y Secrets en GitHub (Settings → Secrets and variables → Actions):
+#   Variables:
+#     NEXT_PUBLIC_API_URL=https://cartones.eliasg.uk
+#     HEALTH_URL=https://rgq-cartones.eliasg.uk (opcional, smoke test)
+#
+# Pre-requisitos manuales en el VPS (una sola vez):
+#   1. Network externa "proxy" creada por ~/infra-claude/vps (ya existe).
+#   2. nginx config: ~/infra-claude/vps/conf.d/cartones-frontend.conf con
+#      proxy_pass http://cartones_frontend:3000 y server_name rgq-cartones.eliasg.uk.
+#   3. Cloudflare tunnel: agregar rgq-cartones.eliasg.uk al ingress en
+#      ~/.cloudflared/config.yml + DNS CNAME en API de Cloudflare.
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vps-frontend-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, linux, arm64]
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verificar entorno
+        run: |
+          docker --version
+          docker compose version
+          uname -m
+          docker network inspect proxy >/dev/null 2>&1 || {
+            echo "::error::La network 'proxy' no existe. Crear ~/infra-claude/vps primero."
+            exit 1
+          }
+
+      - name: Generar .env desde GitHub Variables
+        run: |
+          umask 077
+          cat > .env <<EOF
+          NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
+          EOF
+
+      - name: Deploy con docker compose
+        run: |
+          docker compose down --remove-orphans || true
+          docker compose up -d --build
+
+      - name: Esperar que el frontend levante
+        run: |
+          for i in $(seq 1 24); do
+            STATUS=$(docker inspect -f '{{.State.Health.Status}}' cartones_frontend 2>/dev/null || echo "starting")
+            echo "Intento $i: cartones_frontend health=$STATUS"
+            if [ "$STATUS" = "healthy" ]; then
+              echo "OK"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::Frontend no llegó a healthy en 120s"
+          docker compose ps
+          docker compose logs --tail=80 frontend
+          exit 1
+
+      - name: Smoke test público end-to-end
+        if: vars.HEALTH_URL != ''
+        run: |
+          URL='${{ vars.HEALTH_URL }}'
+          echo "Smoke test → $URL"
+          for i in $(seq 1 12); do
+            CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$URL" || echo 000)
+            if [ "$CODE" -ge 200 ] && [ "$CODE" -lt 400 ]; then
+              echo "Smoke test OK tras ${i} intento(s) — HTTP $CODE"
+              exit 0
+            fi
+            echo "Intento $i — HTTP $CODE; reintento en 10s"
+            sleep 10
+          done
+          echo "::error::Smoke test falló — última HTTP=$CODE"
+          docker compose logs --tail=40 frontend
+          exit 1
+
+      - name: Limpiar imágenes huérfanas
+        if: always()
+        run: docker image prune -f --filter "until=24h" || true
