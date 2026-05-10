@@ -46,7 +46,7 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
     if (session?.error === 'RefreshAccessTokenError') {
         triggerReauth();
         return Promise.reject(
-            new axios.Cancel('Sesión expirada — re-login en curso'),
+            new axios.CanceledError('Sesión expirada — re-login en curso'),
         );
     }
     if (session?.accessToken) {
@@ -74,16 +74,16 @@ api.interceptors.response.use(
 
         switch (status) {
             case 401:
-                // Sesión expirada o token inválido: forzar re-login. El flag dentro
-                // de triggerReauth() previene multiples signIn() concurrentes si
-                // varias requests reciben 401 al mismo tiempo.
+                // Sesión expirada o token inválido: forzar re-login. triggerReauth()
+                // dedupa internamente si varias requests reciben 401 al mismo tiempo.
+                // Mostramos el toast solo si efectivamente vamos a disparar el signIn.
                 if (typeof window !== 'undefined' && !reauthInFlight) {
                     toast.warning('Sesión expirada', {
                         description: 'Por favor, iniciá sesión de nuevo.',
                         duration: 4000,
                     });
-                    triggerReauth();
                 }
+                triggerReauth();
                 break;
 
             case 403:

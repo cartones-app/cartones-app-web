@@ -18,6 +18,12 @@ import type { JWT } from "@auth/core/jwt";
  * concurrentes encuentran el access token vencido, deben compartir UNA sola llamada
  * de refresh — sino N-1 fallan con RT inválido y disparan re-login innecesario.
  * `refreshPromise` (module-scoped) coalesce todos los refreshes simultáneos.
+ *
+ * Limitación: la coalescencia es por proceso Node. En deploys multi-instancia
+ * (Vercel con varias regiones / workers), procesos distintos pueden refrescar en
+ * paralelo. No es un bug per se — el primer RT exitoso "gana", los demás reciben
+ * RefreshAccessTokenError y disparan re-login. Aceptable; si llega a ser problema,
+ * coordinar via storage compartido (Vercel KV, Redis).
  */
 
 let refreshPromise: Promise<JWT> | null = null;
