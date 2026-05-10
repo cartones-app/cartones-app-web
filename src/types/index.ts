@@ -50,6 +50,20 @@ export interface BackendErrorResponse {
     details: string[];
 }
 
+// Resumen de un ProcesoDistribucion para listados.
+// Backend: ProcesoDistribucionResumenDTO. NO incluye los PDFs (BLOBs).
+export interface ProcesoDistribucionResumenDTO {
+    procesoId: string;
+    estado: string;
+    createdAt: string; // ISO 8601 (LocalDateTime serializado)
+    updatedAt: string;
+    createdBy: string;
+    tieneEtiquetas: boolean;
+    tieneResumen: boolean;
+    tamanoEtiquetasBytes: number;
+    tamanoResumenBytes: number;
+}
+
 // Form types for the wizard
 export interface PoolRangeForm {
     inicio: string;

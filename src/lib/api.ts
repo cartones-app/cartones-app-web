@@ -1,5 +1,6 @@
 import api from './axios';
 import {
+    ProcesoDistribucionResumenDTO,
     SimulacionRequestDTO,
     VendedorResponseDTO,
     VendedorSimuladoDTO
@@ -63,4 +64,34 @@ export const downloadPdfs = async (procesoId: string): Promise<Blob> => {
  */
 export const deleteVendedores = async (): Promise<void> => {
     await api.delete('/api/vendedores');
+};
+
+/**
+ * Lista los procesos de distribución del usuario autenticado.
+ * GET /api/distribuciones
+ */
+export const listarMisDistribuciones = async (): Promise<ProcesoDistribucionResumenDTO[]> => {
+    const response = await api.get<ProcesoDistribucionResumenDTO[]>('/api/distribuciones');
+    return response.data;
+};
+
+/**
+ * Lista todos los procesos del sistema (vista admin).
+ * GET /api/admin/distribuciones
+ * Requiere rol ADMIN — el backend devuelve 403 si el usuario no lo tiene.
+ */
+export const listarTodasLasDistribuciones = async (): Promise<ProcesoDistribucionResumenDTO[]> => {
+    const response = await api.get<ProcesoDistribucionResumenDTO[]>('/api/admin/distribuciones');
+    return response.data;
+};
+
+/**
+ * Descarga el ZIP del proceso (vista admin, sin restricción de ownership).
+ * GET /api/admin/distribuciones/{procesoId}/pdfs
+ */
+export const downloadPdfsAdmin = async (procesoId: string): Promise<Blob> => {
+    const response = await api.get(`/api/admin/distribuciones/${procesoId}/pdfs`, {
+        responseType: 'blob',
+    });
+    return response.data;
 };
