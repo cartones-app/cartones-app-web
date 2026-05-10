@@ -37,7 +37,7 @@ interface ConfigurationPanelProps {
     hasSimulated: boolean;
     onVerResultados: () => void;
     // List Data
-    vendedores: any[];
+    vendedores: VendedorResponseDTO[];
     vendedorInputs: VendedorInputDTO[];
     onUpdateVendedor: (id: number, field: keyof VendedorInputDTO, value: number | null | undefined) => void;
     // Results Data
@@ -410,7 +410,7 @@ export function ConfigurationPanel({
                             <ResultsTable resultados={filteredResultados} />
                         ) : (
                             <div className="text-center py-10 text-muted-foreground">
-                                No se encontraron resultados para "{searchTerm}"
+                                No se encontraron resultados para &quot;{searchTerm}&quot;
                             </div>
                         )}
                     </div>
@@ -427,7 +427,7 @@ export function ConfigurationPanel({
                             />
                         ) : (
                             <div className="text-center py-10 text-muted-foreground">
-                                No se encontraron vendedores para "{searchTerm}"
+                                No se encontraron vendedores para &quot;{searchTerm}&quot;
                             </div>
                         )}
                     </>
