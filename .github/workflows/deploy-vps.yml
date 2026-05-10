@@ -94,6 +94,29 @@ jobs:
           docker compose logs --tail=40 frontend
           exit 1
 
+      - name: Purgar cache de Cloudflare
+        # Cloudflare cachea el HTML 1 año (Cache Rule respeta s-maxage de Next.js).
+        # Sin purge, los usuarios verían la versión vieja hasta que expire el cache.
+        # Requiere secrets: CF_ZONE_ID y CF_CACHE_TOKEN (token con permission
+        # "Zone:Cache Purge" sobre la zona eliasg.uk).
+        if: env.CF_ZONE_ID != '' && env.CF_CACHE_TOKEN != ''
+        env:
+          CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+          CF_CACHE_TOKEN: ${{ secrets.CF_CACHE_TOKEN }}
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
+            -H "Authorization: Bearer ${CF_CACHE_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data '{"hosts":["rgq-cartones.eliasg.uk"]}')
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          CODE=$(echo "$RESPONSE" | tail -n 1)
+          if [ "$CODE" != "200" ]; then
+            echo "::error::Cloudflare purge falló (HTTP $CODE): $BODY"
+            exit 1
+          fi
+          echo "Cloudflare cache purged: $BODY"
+
       - name: Limpiar imágenes huérfanas
         if: always()
         run: docker image prune -f --filter "until=24h" || true
