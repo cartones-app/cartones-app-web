@@ -1,4 +1,5 @@
-import axios, { AxiosError } from 'axios';
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { getSession, signIn } from 'next-auth/react';
 import { toast } from 'sonner';
 import { BackendErrorResponse } from '@/types';
 
@@ -13,6 +14,19 @@ export const api = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
+});
+
+// Request interceptor: inject the Keycloak access token from the NextAuth session.
+api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
+    if (typeof window === 'undefined') {
+        // SSR: el interceptor de cliente no aplica.
+        return config;
+    }
+    const session = await getSession();
+    if (session?.accessToken) {
+        config.headers.set('Authorization', `Bearer ${session.accessToken}`);
+    }
+    return config;
 });
 
 // Response error interceptor for global error handling
@@ -33,6 +47,24 @@ api.interceptors.response.use(
         const details = data?.details || [];
 
         switch (status) {
+            case 401:
+                // Sesión expirada o token inválido: forzar re-login.
+                toast.warning('Sesión expirada', {
+                    description: 'Por favor, iniciá sesión de nuevo.',
+                    duration: 4000,
+                });
+                if (typeof window !== 'undefined') {
+                    void signIn('keycloak');
+                }
+                break;
+
+            case 403:
+                toast.error('Permiso denegado', {
+                    description: 'Tu usuario no tiene acceso a esta operación.',
+                    duration: 5000,
+                });
+                break;
+
             case 422:
                 // Excel Processing Error - Show message with details
                 {
