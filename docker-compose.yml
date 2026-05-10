@@ -15,8 +15,11 @@ services:
     # Sin "ports:" — entra por nginx-proxy en la network externa "proxy".
     networks:
       - proxy
+    # Healthcheck TCP (igual que el backend) — wget --spider falla con
+    # los redirects 302 que devuelve Next.js para `/` (redirige a /upload).
+    # El smoke test público del workflow valida la cadena completa fuera.
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/ || exit 1"]
+      test: ["CMD-SHELL", "nc -z localhost 3000 || exit 1"]
       interval: 20s
       timeout: 5s
       retries: 6
