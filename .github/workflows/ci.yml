@@ -1,0 +1,45 @@
+name: CI
+
+# Build verification + lint para el frontend Next.js.
+# Corre en GitHub-hosted ubuntu-latest (gratis, no carga el self-hosted).
+# Triggers:
+#   - PRs hacia next/develop/master → build (R1)
+#   - Pushes a next/develop → verifica que el merge resultante compila (R8)
+
+on:
+  pull_request:
+    branches: [next, develop, master]
+  push:
+    branches: [next, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        env:
+          # Valor de relleno para el build de CI — el bundle real para prod
+          # se buildea en el deploy con la URL real desde GitHub Variables.
+          NEXT_PUBLIC_API_URL: https://example.com
+        run: npm run build
