@@ -3,13 +3,11 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Sparkles, Plus, CheckCircle2, Info } from "lucide-react";
+import { Sparkles, CheckCircle2 } from "lucide-react";
 import { WizardStepper } from "@/components/WizardStepper";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ResultsTable } from "@/components/ResultsTable";
 import { PdfDownloader } from "@/components/PdfDownloader";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { useProcesoStore } from "@/store/useProcesoStore";
 
 export default function ResultadosPage() {
