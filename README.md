@@ -1,36 +1,118 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Cartones App — Frontend Web
 
-## Getting Started
+Cliente Next.js para el sistema de gestión de cartones de bingo (Senete y Telebingo). Sube Excel de vendedores, simula distribución, descarga PDFs y administra la ruta de cobro.
 
-First, run the development server:
+**Autor:** Elías González
+
+---
+
+## Stack
+
+| Capa | Tecnología |
+|------|-----------|
+| Framework | Next.js 16 (App Router) + React 19 |
+| Lenguaje | TypeScript |
+| Estilos | Tailwind CSS + shadcn/ui |
+| Estado | Zustand |
+| HTTP | Axios |
+| Forms | React Hook Form + Zod |
+| Auth | Keycloak (OIDC PKCE, client público `frontend`) |
+| Staging | Vercel (Hobby) |
+| Producción | VPS Hetzner (subdominio `rgq-cartones.eliasg.uk`) |
+| CI / Seguridad | GitHub Actions + CodeQL (`security-extended`) |
+
+---
+
+## Modelo de ramas
+
+| Rama | Uso | Despliegue |
+|------|-----|-----------|
+| `master` | Producción | Push → workflow `deploy-vps.yml` → VPS |
+| `develop` | Staging | Push → CI + CodeQL → al pasar, dispara Vercel Deploy Hook → Vercel (`cartones-app-web.vercel.app`) |
+
+Vercel tiene `Auto-deploy on git push = disabled`. El único disparador del deploy de staging es el job `deploy-staging` de `ci.yml`, que solo corre si `build` y `CodeQL` terminan en `success`.
+
+---
+
+## Arranque local
 
 ```bash
+npm install
+cp .env.example .env.local   # crear con NEXT_PUBLIC_API_URL si no existe
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abrir [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Variables de entorno
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable | Ejemplo local | Staging (Vercel) | Descripción |
+|----------|--------------|------------------|-------------|
+| `NEXT_PUBLIC_API_URL` | `http://localhost:9001` | `https://backend-staging-de76.up.railway.app` | URL base del backend Spring Boot |
 
-## Learn More
+`NEXT_PUBLIC_*` se expone al cliente. No poner secretos con ese prefijo.
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Autenticación
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+El frontend obtiene el JWT directamente desde Keycloak via el client público `frontend` (PKCE, `S256`). El backend valida el token (Spring Resource Server) y autoriza por rol del claim `realm_access.roles`.
 
-## Deploy on Vercel
+| Entorno | Keycloak | Realm |
+|---------|----------|-------|
+| Local | `http://localhost:8080` (docker-compose) | `cartones` |
+| Staging | `https://keycloak-staging-085a.up.railway.app` | `cartones` |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Usuarios demo del realm (passwords temporales, cambiar al primer login):
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `admin` / `admin123` — rol `ADMIN`
+- `distribuidor` / `distribuidor123` — rol `DISTRIBUIDOR`
+
+`redirectUris` y `webOrigins` del client `frontend` están registrados para `localhost:3000` y `cartones-app-web.vercel.app`. Si cambia la URL del frontend hay que actualizar el realm.
+
+---
+
+## Scripts
+
+```bash
+npm run dev     # dev server (Turbopack)
+npm run build   # build de producción
+npm run start   # servir el build
+npm run lint    # ESLint
+```
+
+---
+
+## Despliegue
+
+### Staging (Vercel)
+
+1. Push a `develop`.
+2. `ci.yml` corre `npm ci` + `npm run lint` + `npm run build`.
+3. `codeql.yml` analiza el código.
+4. Si ambos terminan en `success`, el job `deploy-staging` espera al check de CodeQL y golpea el Vercel Deploy Hook.
+5. Vercel construye y despliega a `https://cartones-app-web.vercel.app`.
+
+El Deploy Hook está guardado como secret `VERCEL_DEPLOY_HOOK_URL` del repo.
+
+### Producción (VPS)
+
+Push a `master` → workflow `deploy-vps.yml` → contenedor servido detrás de nginx-proxy + Cloudflare Tunnel en `rgq-cartones.eliasg.uk`.
+
+---
+
+## Estructura
+
+```
+src/
+├── app/                # Rutas (App Router)
+│   ├── configuracion/  # Panel de admin
+│   ├── upload/         # Carga de Excel
+│   └── resultados/     # Vista de distribución y PDFs
+├── components/         # UI components (shadcn/ui + custom)
+├── lib/
+│   ├── api.ts          # Wrappers de endpoints
+│   └── axios.ts        # Instancia + interceptors (toasts en errores)
+├── store/              # Zustand stores
+└── types/              # Tipos compartidos con el backend
+```
