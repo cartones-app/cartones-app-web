@@ -38,7 +38,7 @@ function fmtFechaCorta(iso: string): string {
 
 export default function UploadPage() {
     const router = useRouter();
-    const { setProcesoId, setCurrentStep, reset } = useProcesoStore();
+    const { procesoId, setProcesoId, setCurrentStep, reset } = useProcesoStore();
     const [isLoading, setIsLoading] = useState(false);
     const [hasError, setHasError] = useState(false);
     const selectedFileRef = useRef<File | null>(null);
@@ -109,12 +109,8 @@ export default function UploadPage() {
             </div>
 
             <div className="relative">
-                <div className="container mx-auto px-4 pt-8 flex items-center justify-between gap-2 flex-wrap">
+                <div className="container mx-auto px-4 pt-8 flex justify-center">
                     <WizardStepper currentStep={1} />
-                    <Button variant="ghost" size="sm" onClick={handleReset}>
-                        <RotateCcw className="h-4 w-4 mr-2" />
-                        Reiniciar
-                    </Button>
                 </div>
 
                 <main className="container mx-auto px-4 py-10 max-w-5xl">
@@ -136,7 +132,27 @@ export default function UploadPage() {
                                     onRetry={handleRetry}
                                 />
 
-                                <div className="mt-8 p-4 rounded-lg bg-muted/50 border">
+                                {procesoId && (
+                                    <div className="mt-6 flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm">
+                                        <span className="text-amber-700 dark:text-amber-300 truncate">
+                                            Ya hay una sesión activa
+                                            <span className="font-mono text-xs ml-1 opacity-80">
+                                                ({procesoId.slice(0, 8)}…)
+                                            </span>
+                                        </span>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={handleReset}
+                                            className="text-amber-700 dark:text-amber-300 hover:bg-amber-500/10"
+                                        >
+                                            <RotateCcw className="h-4 w-4 mr-2" />
+                                            Reiniciar
+                                        </Button>
+                                    </div>
+                                )}
+
+                                <div className="mt-6 p-4 rounded-lg bg-muted/50 border">
                                     <h3 className="font-medium text-sm mb-2">Formato esperado del archivo:</h3>
                                     <ul className="text-sm text-muted-foreground space-y-1">
                                         <li>• Archivo Excel (.xlsx)</li>
