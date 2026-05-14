@@ -39,6 +39,15 @@ function fmtFechaCorta(iso: string): string {
 export default function UploadPage() {
     const router = useRouter();
     const { procesoId, setProcesoId, setCurrentStep, reset } = useProcesoStore();
+
+    // Defensa contra estado persistido corrupto: hubo un período donde uploadExcel
+    // guardaba el DTO entero en lugar del string. Si detectamos eso en localStorage,
+    // lo limpiamos en el primer render para evitar que la UI explote.
+    useEffect(() => {
+        if (procesoId != null && typeof procesoId !== "string") {
+            reset();
+        }
+    }, [procesoId, reset]);
     const [isLoading, setIsLoading] = useState(false);
     const [hasError, setHasError] = useState(false);
     const selectedFileRef = useRef<File | null>(null);
@@ -132,7 +141,7 @@ export default function UploadPage() {
                                     onRetry={handleRetry}
                                 />
 
-                                {procesoId && (
+                                {typeof procesoId === "string" && procesoId && (
                                     <div className="mt-6 flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm">
                                         <span className="text-amber-700 dark:text-amber-300 truncate">
                                             Ya hay una sesión activa
