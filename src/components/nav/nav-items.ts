@@ -15,6 +15,8 @@ export interface NavItem {
     title: string;
     description: string;
     icon: LucideIcon;
+    /** Si true, el item solo aparece cuando hay un procesoId activo en el store. */
+    requiresProceso?: boolean;
 }
 
 export interface NavGroup {
@@ -55,6 +57,7 @@ export const NAV_GROUPS: NavGroup[] = [
                 title: "Configuración",
                 description: "Ajustes del simulador de distribución.",
                 icon: Settings,
+                requiresProceso: true,
             },
         ],
     },

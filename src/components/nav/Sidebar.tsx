@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { ShieldCheck, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUserPermissions } from "@/lib/auth-utils";
+import { useProcesoStore } from "@/store/useProcesoStore";
 import { NAV_GROUPS } from "./nav-items";
 
 interface SidebarProps {
@@ -14,6 +15,8 @@ interface SidebarProps {
 export function Sidebar({ onNavigate }: SidebarProps) {
     const pathname = usePathname();
     const { esAdmin } = useUserPermissions();
+    const procesoId = useProcesoStore((s) => s.procesoId);
+    const hayProceso = typeof procesoId === "string" && procesoId.length > 0;
 
     return (
         <nav
@@ -37,7 +40,13 @@ export function Sidebar({ onNavigate }: SidebarProps) {
             </div>
 
             <div className="flex flex-1 flex-col gap-5 px-3 pb-4">
-                {NAV_GROUPS.filter((g) => !g.admin || esAdmin).map((group) => (
+                {NAV_GROUPS.filter((g) => !g.admin || esAdmin)
+                    .map((group) => ({
+                        ...group,
+                        items: group.items.filter((i) => !i.requiresProceso || hayProceso),
+                    }))
+                    .filter((group) => group.items.length > 0)
+                    .map((group) => (
                     <div key={group.title} className="flex flex-col gap-1">
                         <div className="px-2 pb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                             {group.admin && <ShieldCheck className="h-3 w-3" aria-hidden="true" />}
