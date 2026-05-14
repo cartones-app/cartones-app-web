@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download, FileText, Loader2 } from "lucide-react";
+import { FileArchive, FileText, Loader2, Tag } from "lucide-react";
 import { toast } from "sonner";
 import { saveAs } from "file-saver";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,9 @@ import {
 } from "@/components/ui/table";
 import type { ProcesoDistribucionResumenDTO } from "@/types";
 import { downloadPdfs, downloadPdfsAdmin } from "@/lib/api";
+import { extractPdfsFromZip } from "@/lib/pdf-from-zip";
+
+type DescargaTipo = "etiquetas" | "resumen" | "zip";
 
 interface DistribucionesTableProps {
     procesos: ProcesoDistribucionResumenDTO[];
@@ -59,22 +62,44 @@ function fmtBytes(bytes: number): string {
 }
 
 export function DistribucionesTable({ procesos, adminMode = false }: DistribucionesTableProps) {
-    const [descargandoId, setDescargandoId] = useState<string | null>(null);
+    const [descargando, setDescargando] = useState<{ id: string; tipo: DescargaTipo } | null>(null);
 
-    const handleDescargar = async (procesoId: string) => {
-        setDescargandoId(procesoId);
+    const handleDescargar = async (procesoId: string, tipo: DescargaTipo) => {
+        setDescargando({ id: procesoId, tipo });
         try {
             const blob = adminMode
                 ? await downloadPdfsAdmin(procesoId)
                 : await downloadPdfs(procesoId);
-            saveAs(blob, `distribucion-${procesoId.slice(0, 8)}.zip`);
+
+            const idCorto = procesoId.slice(0, 8);
+            if (tipo === "zip") {
+                saveAs(blob, `distribucion-${idCorto}.zip`);
+            } else {
+                const { etiquetas, resumen } = await extractPdfsFromZip(blob);
+                if (tipo === "etiquetas") {
+                    if (!etiquetas) {
+                        toast.warning("No hay PDF de etiquetas en este proceso.");
+                        return;
+                    }
+                    saveAs(etiquetas, `etiquetas-${idCorto}.pdf`);
+                } else {
+                    if (!resumen) {
+                        toast.warning("No hay PDF de resumen en este proceso.");
+                        return;
+                    }
+                    saveAs(resumen, `resumen-${idCorto}.pdf`);
+                }
+            }
             toast.success("Descarga iniciada");
         } catch {
             // El interceptor global ya muestra el toast de error.
         } finally {
-            setDescargandoId(null);
+            setDescargando(null);
         }
     };
+
+    const isBusy = (procesoId: string, tipo: DescargaTipo) =>
+        descargando?.id === procesoId && descargando?.tipo === tipo;
 
     if (procesos.length === 0) {
         return (
@@ -122,10 +147,9 @@ export function DistribucionesTable({ procesos, adminMode = false }: Distribucio
                                         const estado = normalizarEstado(p.estado);
                                         return (
                                             <span
-                                                className={`inline-block px-2 py-0.5 rounded text-xs border ${
-                                                    ESTADO_COLOR[estado] ??
+                                                className={`inline-block px-2 py-0.5 rounded text-xs border ${ESTADO_COLOR[estado] ??
                                                     "bg-muted text-muted-foreground border-border"
-                                                }`}
+                                                    }`}
                                             >
                                                 {estado}
                                             </span>
@@ -139,19 +163,50 @@ export function DistribucionesTable({ procesos, adminMode = false }: Distribucio
                                     {fmtBytes(p.tamanoResumenBytes)}
                                 </TableCell>
                                 <TableCell className="text-right">
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        disabled={!puedeDescargar || descargandoId === p.procesoId}
-                                        onClick={() => handleDescargar(p.procesoId)}
-                                    >
-                                        {descargandoId === p.procesoId ? (
-                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                        ) : (
-                                            <Download className="h-4 w-4" />
-                                        )}
-                                        <span className="ml-2 hidden sm:inline">ZIP</span>
-                                    </Button>
+                                    <div className="inline-flex items-center gap-1">
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            disabled={!p.tieneEtiquetas || isBusy(p.procesoId, "etiquetas")}
+                                            onClick={() => handleDescargar(p.procesoId, "etiquetas")}
+                                            title="Descargar solo etiquetas (PDF)"
+                                            aria-label="Descargar etiquetas"
+                                        >
+                                            {isBusy(p.procesoId, "etiquetas") ? (
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <Tag className="h-4 w-4" />
+                                            )}
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            disabled={!p.tieneResumen || isBusy(p.procesoId, "resumen")}
+                                            onClick={() => handleDescargar(p.procesoId, "resumen")}
+                                            title="Descargar solo resumen (PDF)"
+                                            aria-label="Descargar resumen"
+                                        >
+                                            {isBusy(p.procesoId, "resumen") ? (
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <FileText className="h-4 w-4" />
+                                            )}
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            disabled={!puedeDescargar || isBusy(p.procesoId, "zip")}
+                                            onClick={() => handleDescargar(p.procesoId, "zip")}
+                                            title="Descargar ZIP completo"
+                                        >
+                                            {isBusy(p.procesoId, "zip") ? (
+                                                <Loader2 className="h-4 w-4" />
+                                            ) : (
+                                                <FileArchive className="h-4 w-4" />
+                                            )}
+                                            <span className="ml-2 hidden sm:inline">ZIP</span>
+                                        </Button>
+                                    </div>
                                 </TableCell>
                             </TableRow>
                         );
