@@ -33,7 +33,11 @@ export default function MisDistribucionesPage() {
 
     const stats = useMemo(() => {
         const total = procesos.length;
-        const completados = procesos.filter((p) => p.estado === "COMPLETADO").length;
+        // El backend serializa los estados en lowercase. Comparamos case-insensitive
+        // para no atarnos a esa decisión.
+        const completados = procesos.filter(
+            (p) => (p.estado ?? "").toUpperCase() === "COMPLETADO",
+        ).length;
         const pendientes = total - completados;
         return { total, completados, pendientes };
     }, [procesos]);

@@ -28,6 +28,15 @@ const ESTADO_COLOR: Record<string, string> = {
     COMPLETADO: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
 };
 
+/**
+ * El backend serializa los estados en lowercase (enum EstadoEnum con @JsonValue).
+ * Acá normalizamos a UPPERCASE solo para presentación y matching del mapa de
+ * colores — así si en algún momento se cambia el case en el backend, no rompe.
+ */
+function normalizarEstado(estado: string | undefined | null): string {
+    return (estado ?? "").trim().toUpperCase();
+}
+
 function fmtFecha(iso: string): string {
     try {
         return new Date(iso).toLocaleString("es-AR", {
@@ -109,14 +118,19 @@ export function DistribucionesTable({ procesos, adminMode = false }: Distribucio
                                     </TableCell>
                                 )}
                                 <TableCell>
-                                    <span
-                                        className={`inline-block px-2 py-0.5 rounded text-xs border ${
-                                            ESTADO_COLOR[p.estado] ??
-                                            "bg-muted text-muted-foreground border-border"
-                                        }`}
-                                    >
-                                        {p.estado}
-                                    </span>
+                                    {(() => {
+                                        const estado = normalizarEstado(p.estado);
+                                        return (
+                                            <span
+                                                className={`inline-block px-2 py-0.5 rounded text-xs border ${
+                                                    ESTADO_COLOR[estado] ??
+                                                    "bg-muted text-muted-foreground border-border"
+                                                }`}
+                                            >
+                                                {estado}
+                                            </span>
+                                        );
+                                    })()}
                                 </TableCell>
                                 <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
                                     {fmtBytes(p.tamanoEtiquetasBytes)}

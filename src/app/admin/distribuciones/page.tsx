@@ -33,7 +33,9 @@ export default function AdminDistribucionesPage() {
     const stats = useMemo(() => {
         const total = procesos.length;
         const usuarios = new Set(procesos.map((p) => p.createdBy).filter(Boolean)).size;
-        const completados = procesos.filter((p) => p.estado === "COMPLETADO").length;
+        const completados = procesos.filter(
+            (p) => (p.estado ?? "").toUpperCase() === "COMPLETADO",
+        ).length;
         return { total, usuarios, completados };
     }, [procesos]);
 
