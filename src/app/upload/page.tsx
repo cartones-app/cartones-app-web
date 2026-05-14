@@ -10,6 +10,7 @@ import { FileUploader } from "@/components/FileUploader";
 import { WizardStepper } from "@/components/WizardStepper";
 import { useProcesoStore } from "@/store/useProcesoStore";
 import { downloadPdfs, listarMisDistribuciones, uploadExcel } from "@/lib/api";
+import { formatFechaHoraCorta } from "@/lib/date-format";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,19 +23,6 @@ const ESTADO_COLOR: Record<string, string> = {
     VERIFICANDO: "bg-blue-500/10 text-blue-600 border-blue-500/30",
     COMPLETADO: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
 };
-
-function fmtFechaCorta(iso: string): string {
-    try {
-        return new Date(iso).toLocaleString("es-AR", {
-            day: "2-digit",
-            month: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-    } catch {
-        return iso;
-    }
-}
 
 export default function UploadPage() {
     const router = useRouter();
@@ -227,7 +215,7 @@ export default function UploadPage() {
                                                     </span>
                                                 </div>
                                                 <div className="text-xs text-muted-foreground mt-0.5">
-                                                    {fmtFechaCorta(p.createdAt)}
+                                                    {formatFechaHoraCorta(p.createdAt)}
                                                 </div>
                                             </div>
                                             <Button

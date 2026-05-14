@@ -26,20 +26,7 @@ import type {
     SesionRutaRegistroResponseDTO,
     SesionRutaResponseDTO,
 } from "@/types";
-
-function fmtFecha(iso: string): string {
-    try {
-        return new Date(iso).toLocaleString("es-AR", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-    } catch {
-        return iso;
-    }
-}
+import { formatFechaHora } from "@/lib/date-format";
 
 export default function AdminSesionRutaDetailPage() {
     const params = useParams<{ sesionId: string }>();
@@ -109,7 +96,7 @@ export default function AdminSesionRutaDetailPage() {
                         {sesion && (
                             <p className="text-sm text-muted-foreground mt-1">
                                 <span className="font-mono">{sesion.sesionId.slice(0, 8)}…</span> ·
-                                creada {fmtFecha(sesion.createdAt)} por {sesion.createdBy || "—"} ·
+                                creada {formatFechaHora(sesion.createdAt)} por {sesion.createdBy || "—"} ·
                                 estado <strong>{sesion.estado}</strong> ·
                                 {sesion.registrosCompletados ?? 0}/{sesion.totalRegistros ?? 0} completos
                             </p>

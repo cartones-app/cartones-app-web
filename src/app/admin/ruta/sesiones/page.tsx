@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/PageHeader";
 import { TableSkeleton } from "@/components/TableSkeleton";
+import { formatFechaHora } from "@/lib/date-format";
 import {
     Table,
     TableBody,
@@ -34,20 +35,6 @@ const ESTADO_COLOR: Record<string, string> = {
     COMPLETADA: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
     ARCHIVADA: "bg-muted text-muted-foreground border-border",
 };
-
-function fmtFecha(iso: string): string {
-    try {
-        return new Date(iso).toLocaleString("es-AR", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-    } catch {
-        return iso;
-    }
-}
 
 export default function AdminSesionesRutaPage() {
     const [sesiones, setSesiones] = useState<SesionRutaResponseDTO[]>([]);
@@ -166,7 +153,7 @@ export default function AdminSesionesRutaPage() {
                                         {s.sesionId.slice(0, 8)}…
                                     </TableCell>
                                     <TableCell className="whitespace-nowrap text-sm">
-                                        {fmtFecha(s.createdAt)}
+                                        {formatFechaHora(s.createdAt)}
                                     </TableCell>
                                     <TableCell className="text-sm text-muted-foreground">
                                         {s.createdBy || "—"}

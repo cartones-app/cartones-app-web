@@ -16,6 +16,7 @@ import {
 import type { ProcesoDistribucionResumenDTO } from "@/types";
 import { downloadPdfs, downloadPdfsAdmin } from "@/lib/api";
 import { extractPdfsFromZip } from "@/lib/pdf-from-zip";
+import { formatFechaHora } from "@/lib/date-format";
 
 type DescargaTipo = "etiquetas" | "resumen" | "zip";
 
@@ -38,20 +39,6 @@ const ESTADO_COLOR: Record<string, string> = {
  */
 function normalizarEstado(estado: string | undefined | null): string {
     return (estado ?? "").trim().toUpperCase();
-}
-
-function fmtFecha(iso: string): string {
-    try {
-        return new Date(iso).toLocaleString("es-AR", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-    } catch {
-        return iso;
-    }
 }
 
 function fmtBytes(bytes: number): string {
@@ -132,7 +119,7 @@ export function DistribucionesTable({ procesos, adminMode = false }: Distribucio
                         return (
                             <TableRow key={p.procesoId}>
                                 <TableCell className="whitespace-nowrap text-sm">
-                                    {fmtFecha(p.createdAt)}
+                                    {formatFechaHora(p.createdAt)}
                                 </TableCell>
                                 <TableCell className="font-mono text-xs">
                                     {p.procesoId.slice(0, 8)}…
