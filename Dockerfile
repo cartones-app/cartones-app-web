@@ -10,14 +10,13 @@ WORKDIR /app
 # (packageManager: pnpm@x.y.z). Sin esto, "pnpm" no existiría en la imagen.
 RUN corepack enable
 
-# NEXT_PUBLIC_* se bakea en el bundle al build. El workflow lo pasa
-# como --build-arg desde GitHub Variables.
+# NEXT_PUBLIC_* se bakea en el bundle al build (Next.js solo expone al
+# cliente las env que matchean ese prefijo). El workflow lo pasa como
+# --build-arg desde GitHub Variables. Las credenciales/issuer de Keycloak
+# y NEXTAUTH_URL son runtime-only (los lee el server en cada request),
+# no van acá — se inyectan en compose.yml como `environment:`.
 ARG NEXT_PUBLIC_API_URL
-ARG NEXTAUTH_URL
-ARG KEYCLOAK_ISSUER
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-ENV NEXTAUTH_URL=${NEXTAUTH_URL}
-ENV KEYCLOAK_ISSUER=${KEYCLOAK_ISSUER}
 
 # 1. Cachea dependencias por separado del código (cache de pnpm en /root/.local/share/pnpm).
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml* ./

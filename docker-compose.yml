@@ -3,23 +3,21 @@ services:
     build:
       context: .
       args:
-        # NEXT_PUBLIC_* se bakea en el bundle al build. Lo pasamos como
-        # build-arg desde el .env que el workflow genera leyendo GitHub Variables.
+        # NEXT_PUBLIC_* se bakea en el bundle al build.
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-        NEXTAUTH_URL: ${NEXTAUTH_URL}
-        KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER}
     container_name: cartones_frontend
     restart: always
     environment:
       NODE_ENV: production
       PORT: 3000
       HOSTNAME: 0.0.0.0
-      # NextAuth runtime secrets (no se bakean — runtime-only).
+      # NextAuth runtime — sin estos, el login OIDC no inicializa.
+      # Vienen del .env que el workflow genera leyendo GitHub Variables/Secrets.
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
       AUTH_SECRET: ${AUTH_SECRET}
       AUTH_KEYCLOAK_ID: ${AUTH_KEYCLOAK_ID}
       AUTH_KEYCLOAK_SECRET: ${AUTH_KEYCLOAK_SECRET}
-      AUTH_KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER}
-      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      AUTH_KEYCLOAK_ISSUER: ${AUTH_KEYCLOAK_ISSUER}
     networks:
       - proxy
     # Healthcheck con Node.js puro (la imagen es node:22-alpine).
