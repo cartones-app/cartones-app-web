@@ -122,39 +122,58 @@ export default function UploadPage() {
                         </CardHeader>
                         <CardContent className="pt-6">
                             <div className="mx-auto max-w-2xl">
-                                <FileUploader
-                                    onFileSelect={handleFileSelect}
-                                    isLoading={isLoading}
-                                    hasError={hasError}
-                                    onRetry={handleRetry}
-                                />
-
-                                {typeof procesoId === "string" && procesoId && (
-                                    <div className="mt-6 flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm">
-                                        <span className="text-amber-700 dark:text-amber-300 truncate">
-                                            Ya hay una sesión activa
-                                            <span className="font-mono text-xs ml-1 opacity-80">
-                                                ({procesoId.slice(0, 8)}…)
-                                            </span>
-                                        </span>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={handleReset}
-                                            className="text-amber-700 dark:text-amber-300 hover:bg-amber-500/10"
-                                        >
-                                            <RotateCcw className="h-4 w-4 mr-2" />
-                                            Reiniciar
-                                        </Button>
+                                {typeof procesoId === "string" && procesoId ? (
+                                    <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-5">
+                                        <div className="flex items-start gap-3">
+                                            <div className="rounded-full bg-amber-500/15 p-2">
+                                                <FileText className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="font-medium text-amber-900 dark:text-amber-200">
+                                                    Ya tenés una sesión activa
+                                                </h3>
+                                                <p className="text-sm text-amber-800/80 dark:text-amber-300/80 mt-1">
+                                                    Proceso{" "}
+                                                    <span className="font-mono">
+                                                        {procesoId.slice(0, 8)}…
+                                                    </span>
+                                                    . Continuá donde la dejaste o reiniciá para
+                                                    subir otro Excel.
+                                                </p>
+                                                <div className="mt-4 flex flex-wrap gap-2">
+                                                    <Button
+                                                        onClick={() => router.push("/configuracion")}
+                                                    >
+                                                        Continuar sesión
+                                                        <ArrowRight className="h-4 w-4 ml-2" />
+                                                    </Button>
+                                                    <Button variant="outline" onClick={handleReset}>
+                                                        <RotateCcw className="h-4 w-4 mr-2" />
+                                                        Reiniciar y subir otro Excel
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                )}
+                                ) : (
+                                    <>
+                                        <FileUploader
+                                            onFileSelect={handleFileSelect}
+                                            isLoading={isLoading}
+                                            hasError={hasError}
+                                            onRetry={handleRetry}
+                                        />
 
-                                <div className="mt-6 p-4 rounded-lg bg-muted/50 border">
-                                    <h3 className="font-medium text-sm mb-2">Formato esperado del archivo:</h3>
-                                    <ul className="text-sm text-muted-foreground space-y-1">
-                                        <li>• Archivo Excel (.xlsx)</li>
-                                    </ul>
-                                </div>
+                                        <div className="mt-6 p-4 rounded-lg bg-muted/50 border">
+                                            <h3 className="font-medium text-sm mb-2">
+                                                Formato esperado del archivo:
+                                            </h3>
+                                            <ul className="text-sm text-muted-foreground space-y-1">
+                                                <li>• Archivo Excel (.xlsx)</li>
+                                            </ul>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
