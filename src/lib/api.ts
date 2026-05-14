@@ -16,20 +16,24 @@ import {
 } from '@/types';
 
 /**
- * Upload Excel file and get procesoId
+ * Upload Excel file and get procesoId.
  * POST /api/vendedores/carga
+ *
+ * El backend responde con CargaVendedoresResponseDTO { filasIgnoradas, procesoId }.
+ * Devolvemos solo el procesoId acá; si el caller necesita filasIgnoradas vamos
+ * a tener que cambiar la firma.
  */
 export const uploadExcel = async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await api.post<string>('/api/vendedores/carga', formData, {
-        headers: {
-            'Content-Type': 'multipart/form-data',
-        },
-    });
+    const response = await api.post<{ procesoId: string; filasIgnoradas?: string[] }>(
+        '/api/vendedores/carga',
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
 
-    return response.data;
+    return response.data.procesoId;
 };
 
 /**
