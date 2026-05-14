@@ -1,0 +1,41 @@
+name: Staging Alias
+
+# Tras CI verde sobre develop, Vercel auto-deploya y este workflow
+# reasigna `cartones-app-web-staging.vercel.app` al nuevo deployment.
+# Vive en un workflow separado (no en CI) para no bloquear a Vercel:
+# Vercel espera por CI; este workflow espera por Vercel.
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [develop]
+
+jobs:
+  alias:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Reasignar cartones-app-web-staging.vercel.app al nuevo deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then echo "Missing VERCEL_TOKEN secret"; exit 1; fi
+          # Polear hasta 10 min hasta que Vercel reporte el deployment READY
+          # para este commit. Vercel arrancó el deploy cuando CI pasó, así
+          # que típicamente tarda 30s-2min en estar READY desde este punto.
+          DEPLOY=""
+          for i in $(seq 1 60); do
+            DEPLOY=$(curl -fsS -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v6/deployments?app=cartones-app-web&state=READY&limit=10" \
+              | jq -r --arg sha "$COMMIT_SHA" '.deployments[] | select(.meta.githubCommitSha == $sha) | .url' | head -n1)
+            if [ -n "$DEPLOY" ]; then break; fi
+            sleep 10
+          done
+          if [ -z "$DEPLOY" ]; then
+            echo "No READY deployment for $COMMIT_SHA after 10 min"; exit 1
+          fi
+          echo "Aliasing https://$DEPLOY -> cartones-app-web-staging.vercel.app"
+          npx --yes vercel@53 alias set "https://$DEPLOY" cartones-app-web-staging.vercel.app --token "$VERCEL_TOKEN"

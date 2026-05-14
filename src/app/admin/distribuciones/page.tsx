@@ -26,6 +26,10 @@ export default function AdminDistribucionesPage() {
     };
 
     useEffect(() => {
+        // Patrón "load on mount" en Client Component. La regla
+        // react-hooks/set-state-in-effect recomienda Server Components o
+        // SWR/React Query — pendiente migrar a RSC en una pasada futura.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         cargar();
     }, []);
 

@@ -10,6 +10,10 @@ export function ThemeToggle() {
     const [mounted, setMounted] = React.useState(false);
 
     React.useEffect(() => {
+        // Patrón SSR-safe estándar de next-themes: el primer render server
+        // no conoce la preferencia del cliente; mounted=true en mount evita
+        // hydration mismatch del icono.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setMounted(true);
     }, []);
 
