@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { ArrowLeft, Pencil, Plus, RefreshCw, Save, ShieldCheck, Trash2, X } from "lucide-react";
+import { Pencil, Plus, RefreshCw, Save, ShieldCheck, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { PageHeader } from "@/components/PageHeader";
+import { TableSkeleton } from "@/components/TableSkeleton";
 import {
     Table,
     TableBody,
@@ -114,28 +115,13 @@ export default function AdminExclusionesRutaPage() {
 
     return (
         <main className="container mx-auto px-4 py-8 max-w-5xl">
-            <div className="mb-6">
-                <Link
-                    href="/"
-                    className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-2"
-                >
-                    <ArrowLeft className="h-3 w-3 mr-1" />
-                    Volver al inicio
-                </Link>
-                <div className="flex items-center justify-between gap-4">
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-2xl font-semibold">Exclusiones de ruta</h1>
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-primary/10 text-primary border border-primary/20">
-                                <ShieldCheck className="h-3 w-3" aria-hidden="true" />
-                                ADMIN
-                            </span>
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-1">
-                            Nombres de vendedores (o entradas como &quot;TOTAL&quot;) que el módulo ruta excluye automáticamente.
-                        </p>
-                    </div>
-                    <div className="flex gap-2">
+            <PageHeader
+                title="Exclusiones de ruta"
+                description="Nombres de vendedores (o entradas como “TOTAL”) que el módulo ruta excluye automáticamente."
+                icon={ShieldCheck}
+                admin
+                actions={
+                    <>
                         <Button variant="outline" size="sm" onClick={cargar} disabled={cargando}>
                             <RefreshCw className={`h-4 w-4 ${cargando ? "animate-spin" : ""}`} />
                             <span className="ml-2 hidden sm:inline">Recargar</span>
@@ -144,9 +130,9 @@ export default function AdminExclusionesRutaPage() {
                             <Plus className="h-4 w-4 mr-2" />
                             Nueva
                         </Button>
-                    </div>
-                </div>
-            </div>
+                    </>
+                }
+            />
 
             {editing && (
                 <div className="mb-4 p-4 rounded-lg border bg-card">
@@ -202,12 +188,9 @@ export default function AdminExclusionesRutaPage() {
             )}
 
             {cargando && exclusiones.length === 0 ? (
-                <div className="rounded-lg border border-dashed p-12 text-center text-muted-foreground">
-                    <RefreshCw className="mx-auto h-6 w-6 animate-spin mb-3" />
-                    Cargando…
-                </div>
+                <TableSkeleton rows={4} columns={5} />
             ) : exclusiones.length === 0 ? (
-                <div className="rounded-lg border border-dashed p-12 text-center text-muted-foreground">
+                <div className="rounded-xl border border-dashed bg-card/40 p-12 text-center text-muted-foreground">
                     No hay exclusiones cargadas todavía.
                 </div>
             ) : (
