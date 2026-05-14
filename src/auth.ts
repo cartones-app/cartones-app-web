@@ -1,6 +1,6 @@
 import NextAuth from "next-auth";
 import Keycloak from "next-auth/providers/keycloak";
-import type { JWT } from "@auth/core/jwt";
+import type { JWT } from "next-auth/jwt";
 
 /**
  * Auth.js (NextAuth v5) — Keycloak OIDC via Authorization Code + PKCE (BFF).
@@ -9,24 +9,76 @@ import type { JWT } from "@auth/core/jwt";
  * token de Keycloak se persiste en el JWT de sesión (cookie cifrada) y se inyecta
  * en cada llamada al backend via interceptor de Axios.
  *
- * Refresh: si el access token expiró y hay refresh token, intercambia silenciosamente
- * contra el endpoint `token` del realm. Si falla, marca `error=RefreshAccessTokenError`
- * y el interceptor de Axios fuerza un re-login completo.
+ * Refresh: si el access token expiró (o está por expirar dentro del margen)
+ * y hay refresh token, intercambia silenciosamente contra el endpoint `token`
+ * del realm. Si falla, marca `error=RefreshAccessTokenError` y el interceptor
+ * de Axios fuerza un re-login completo.
  *
  * Coalescencia de refresh: el endpoint Keycloak invalida el refresh token al primer
  * uso exitoso (Refresh Token Max Reuse Count = 0 por default). Si N requests
  * concurrentes encuentran el access token vencido, deben compartir UNA sola llamada
  * de refresh — sino N-1 fallan con RT inválido y disparan re-login innecesario.
- * `refreshPromise` (module-scoped) coalesce todos los refreshes simultáneos.
+ * Usamos un `Map<refreshToken, Promise>` para coalescer POR TOKEN, evitando
+ * mezclar sesiones de usuarios distintos en el mismo proceso Node.
  *
  * Limitación: la coalescencia es por proceso Node. En deploys multi-instancia
  * (Vercel con varias regiones / workers), procesos distintos pueden refrescar en
  * paralelo. No es un bug per se — el primer RT exitoso "gana", los demás reciben
  * RefreshAccessTokenError y disparan re-login. Aceptable; si llega a ser problema,
  * coordinar via storage compartido (Vercel KV, Redis).
+ *
+ * Edge-compat: el decode del JWT (extractRoles) usa atob+URI-decoding, sin
+ * dependencia de Node `Buffer`. Funciona tanto en runtime Node como Edge
+ * (middleware) por si la session se lee en ese contexto.
  */
 
-let refreshPromise: Promise<JWT> | null = null;
+/** Margen para refrescar antes del expiry — evita que un access token expire
+ *  "en vuelo" entre que pasamos por el callback y el backend lo valida. */
+const TOKEN_REFRESH_MARGIN_SECONDS = 15;
+
+/**
+ * Decodifica el payload de un JWT compact sin verificar firma. Solo lo usamos
+ * para extraer claims del access token que viene de Keycloak (ya validado por
+ * Keycloak antes de devolverlo a este server-side callback).
+ *
+ * Defensivo ante tokens malformados — si algo falla devuelve null. Nunca lanza.
+ * Compatible con Edge runtime: no usa Node `Buffer`.
+ */
+function decodeJwtPayloadUnsafe(jwt: string | undefined): Record<string, unknown> | null {
+  if (!jwt) return null;
+  const parts = jwt.split(".");
+  if (parts.length !== 3) return null;
+  try {
+    // base64url -> base64
+    const b64 = parts[1].replaceAll("-", "+").replaceAll("_", "/");
+    // Decode con soporte UTF-8 (atob solo maneja latin1; el truco percent-encoded
+    // mapea bytes 0-255 a una secuencia URL-encoded que decodeURIComponent interpreta
+    // correctamente como UTF-8).
+    const raw = atob(b64);
+    const json = decodeURIComponent(
+      [...raw]
+        .map((c) => "%" + ("00" + (c.codePointAt(0) ?? 0).toString(16)).slice(-2))
+        .join(""),
+    );
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extrae los roles del realm en un JWT de Keycloak.
+ * Keycloak los expone en `realm_access.roles: string[]`.
+ */
+function extractRoles(jwt: string | undefined): string[] {
+  const payload = decodeJwtPayloadUnsafe(jwt);
+  if (!payload) return [];
+  const realmAccess = payload["realm_access"];
+  if (!realmAccess || typeof realmAccess !== "object") return [];
+  const roles = (realmAccess as { roles?: unknown }).roles;
+  if (!Array.isArray(roles)) return [];
+  return roles.filter((r): r is string => typeof r === "string");
+}
 
 async function doRefresh(token: JWT): Promise<JWT> {
   if (!token.refreshToken) {
@@ -64,22 +116,43 @@ async function doRefresh(token: JWT): Promise<JWT> {
     return {
       ...token,
       accessToken: refreshed.access_token,
+      // Si Keycloak no rota el RT en esta llamada, mantenemos el anterior.
       refreshToken: refreshed.refresh_token ?? token.refreshToken,
       expiresAt: Math.floor(Date.now() / 1000) + refreshed.expires_in,
+      // Los roles pueden cambiar entre refreshes (admin removido en runtime).
+      // Releemos del access token nuevo en lugar de heredar los viejos.
+      roles: extractRoles(refreshed.access_token),
       error: undefined,
     };
-  } catch {
+  } catch (error) {
+    // Visibilidad en logs server-side; el cliente solo ve `error` en la session.
+    console.error("[auth] Refresh access token failed:", error);
     return { ...token, error: "RefreshAccessTokenError" };
   }
 }
 
+/**
+ * Map keyed por refresh token: si dos requests de usuarios DISTINTOS llegan al
+ * mismo tiempo con tokens distintos, coalesce cada grupo por separado. Evita
+ * que la promise de un usuario contamine la del otro.
+ */
+const refreshPromises = new Map<string, Promise<JWT>>();
+
 function refreshTokenCoalesced(token: JWT): Promise<JWT> {
-  if (!refreshPromise) {
-    refreshPromise = doRefresh(token).finally(() => {
-      refreshPromise = null;
-    });
+  const key = token.refreshToken;
+  if (!key) {
+    // Sin refresh token no podemos coalescer; doRefresh igual va a fallar con
+    // RefreshAccessTokenError, lo devolvemos directo.
+    return doRefresh(token);
   }
-  return refreshPromise;
+  const existing = refreshPromises.get(key);
+  if (existing) return existing;
+
+  const promise = doRefresh(token).finally(() => {
+    refreshPromises.delete(key);
+  });
+  refreshPromises.set(key, promise);
+  return promise;
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -101,20 +174,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           refreshToken: account.refresh_token,
           expiresAt: account.expires_at,
           idToken: account.id_token,
+          roles: extractRoles(account.access_token),
         };
       }
 
-      // 2) Access token todavía vigente: pasar tal cual.
-      if (token.expiresAt && Date.now() < token.expiresAt * 1000) {
+      // 2) Access token todavía vigente (con margen de seguridad): pasar tal cual.
+      const nowSec = Math.floor(Date.now() / 1000);
+      if (token.expiresAt && nowSec < token.expiresAt - TOKEN_REFRESH_MARGIN_SECONDS) {
         return token;
       }
 
-      // 3) Expiró: refresh coalesced (1 fetch para N callbacks concurrentes).
+      // 3) Expiró (o está por expirar): refresh coalesced.
       return refreshTokenCoalesced(token);
     },
     async session({ session, token }) {
       session.accessToken = token.accessToken;
       session.error = token.error;
+      session.roles = token.roles ?? [];
       return session;
     },
   },

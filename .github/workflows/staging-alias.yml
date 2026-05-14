@@ -17,6 +17,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
       - name: Reasignar cartones-app-web-staging.vercel.app al nuevo deploy
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -38,4 +43,4 @@ jobs:
             echo "No READY deployment for $COMMIT_SHA after 10 min"; exit 1
           fi
           echo "Aliasing https://$DEPLOY -> cartones-app-web-staging.vercel.app"
-          npx --yes vercel@53 alias set "https://$DEPLOY" cartones-app-web-staging.vercel.app --token "$VERCEL_TOKEN"
+          pnpm dlx vercel@53 alias set "https://$DEPLOY" cartones-app-web-staging.vercel.app --token "$VERCEL_TOKEN"

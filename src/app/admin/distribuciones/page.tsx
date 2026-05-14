@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { ArrowLeft, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { RefreshCw, Users2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { DistribucionesTable } from "@/components/DistribucionesTable";
+import { PageHeader } from "@/components/PageHeader";
+import { TableSkeleton } from "@/components/TableSkeleton";
 import { listarTodasLasDistribuciones } from "@/lib/api";
 import type { ProcesoDistribucionResumenDTO } from "@/types";
 
@@ -19,68 +19,79 @@ export default function AdminDistribucionesPage() {
             const data = await listarTodasLasDistribuciones();
             setProcesos(data);
         } catch {
-            // El backend devuelve 403 si no tenés rol ADMIN — el interceptor lo muestra.
+            // 403 si no tenés rol ADMIN — el interceptor lo muestra.
         } finally {
             setCargando(false);
         }
     };
 
     useEffect(() => {
-        // Patrón "load on mount" en Client Component. La regla
-        // react-hooks/set-state-in-effect recomienda Server Components o
-        // SWR/React Query — pendiente migrar a RSC en una pasada futura.
         // eslint-disable-next-line react-hooks/set-state-in-effect
         cargar();
     }, []);
 
+    const stats = useMemo(() => {
+        const total = procesos.length;
+        const usuarios = new Set(procesos.map((p) => p.createdBy).filter(Boolean)).size;
+        const completados = procesos.filter(
+            (p) => (p.estado ?? "").toUpperCase() === "COMPLETADO",
+        ).length;
+        return { total, usuarios, completados };
+    }, [procesos]);
+
     return (
-        <div className="min-h-screen relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-background" />
-            <div className="relative z-10">
-                <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-20">
-                    <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Sparkles className="h-6 w-6 text-primary" />
-                            <h1 className="font-semibold text-lg">Gestión de Bingos</h1>
-                        </div>
-                        <ThemeToggle />
-                    </div>
-                </header>
+        <main className="container mx-auto px-4 py-8 max-w-7xl">
+            <PageHeader
+                title="Distribuciones"
+                description="Vista global — todos los procesos del sistema."
+                icon={Users2}
+                admin
+                actions={
+                    <Button variant="outline" size="sm" onClick={cargar} disabled={cargando}>
+                        <RefreshCw className={`h-4 w-4 ${cargando ? "animate-spin" : ""}`} />
+                        <span className="ml-2 hidden sm:inline">Recargar</span>
+                    </Button>
+                }
+            />
 
-                <main className="container mx-auto px-4 py-8 max-w-7xl">
-                    <div className="flex items-center justify-between mb-6">
-                        <div>
-                            <Link href="/" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-2">
-                                <ArrowLeft className="h-3 w-3 mr-1" />
-                                Volver al inicio
-                            </Link>
-                            <div className="flex items-center gap-2">
-                                <h2 className="text-2xl font-semibold">Distribuciones (admin)</h2>
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-primary/10 text-primary border border-primary/20">
-                                    <ShieldCheck className="h-3 w-3" />
-                                    ADMIN
-                                </span>
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                                Vista global — todos los procesos del sistema.
-                            </p>
-                        </div>
-                        <Button variant="outline" size="sm" onClick={cargar} disabled={cargando}>
-                            <RefreshCw className={`h-4 w-4 ${cargando ? "animate-spin" : ""}`} />
-                            <span className="ml-2 hidden sm:inline">Recargar</span>
-                        </Button>
-                    </div>
+            {procesos.length > 0 && (
+                <div className="grid grid-cols-3 gap-3 mb-6">
+                    <StatCard label="Procesos" value={stats.total} />
+                    <StatCard label="Usuarios distintos" value={stats.usuarios} />
+                    <StatCard label="Completados" value={stats.completados} accent="emerald" />
+                </div>
+            )}
 
-                    {cargando && procesos.length === 0 ? (
-                        <div className="rounded-lg border border-dashed p-12 text-center text-muted-foreground">
-                            <RefreshCw className="mx-auto h-6 w-6 animate-spin mb-3" />
-                            Cargando…
-                        </div>
-                    ) : (
-                        <DistribucionesTable procesos={procesos} adminMode />
-                    )}
-                </main>
+            {cargando && procesos.length === 0 ? (
+                <TableSkeleton rows={6} columns={7} />
+            ) : procesos.length === 0 ? (
+                <div className="rounded-xl border border-dashed bg-card/40 p-12 text-center text-muted-foreground">
+                    <p className="text-sm">Nadie generó distribuciones todavía.</p>
+                </div>
+            ) : (
+                <DistribucionesTable procesos={procesos} adminMode />
+            )}
+        </main>
+    );
+}
+
+function StatCard({
+    label,
+    value,
+    accent,
+}: {
+    label: string;
+    value: number;
+    accent?: "emerald";
+}) {
+    const accentClass =
+        accent === "emerald" ? "text-emerald-600 dark:text-emerald-400" : "text-foreground";
+    return (
+        <div className="rounded-lg border bg-card px-4 py-3">
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                {label}
             </div>
+            <div className={`text-2xl font-semibold tabular-nums ${accentClass}`}>{value}</div>
         </div>
     );
 }
