@@ -3,8 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/components/AuthProvider";
-import { AuthButton } from "@/components/AuthButton";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { AppShell } from "@/components/nav/AppShell";
 import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = Geist({
@@ -39,16 +38,7 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
-              <div className="container mx-auto flex h-14 items-center justify-between gap-2 px-4">
-                <div className="font-semibold">Gestión de Cartones</div>
-                <div className="flex items-center gap-2">
-                  <ThemeToggle />
-                  <AuthButton />
-                </div>
-              </div>
-            </header>
-            {children}
+            <AppShell>{children}</AppShell>
             <Toaster richColors position="top-right" />
           </ThemeProvider>
         </AuthProvider>
