@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Loader2, ArrowLeft, ArrowRight, Sparkles, RotateCcw } from "lucide-react";
+import { Loader2, ArrowLeft, Sparkles, RotateCcw } from "lucide-react";
 import { WizardStepper } from "@/components/WizardStepper";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ConfigurationPanel } from "@/components/ConfigurationPanel";

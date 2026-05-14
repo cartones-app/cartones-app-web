@@ -5,6 +5,12 @@ name: CI
 # Triggers:
 #   - PRs hacia next/develop/master → build (R1)
 #   - Pushes a next/develop → verifica que el merge resultante compila (R8)
+#
+# Vercel observa este workflow vía la integración nativa de GitHub: cuando
+# CI termina verde sobre develop, dispara el deploy a Vercel.
+# El alias staging (cartones-app-web-staging.vercel.app) se reasigna en
+# .github/workflows/staging-alias.yml — un workflow separado que corre
+# DESPUÉS de CI (workflow_run) para no bloquear a Vercel.
 
 on:
   pull_request:
