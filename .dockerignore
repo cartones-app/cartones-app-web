@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.github
+.vscode
+.idea
+.env*
+!.env.example
+README.md
+*.log
+.DS_Store
+coverage
+.turbo
+.pnpm-store
+data
+notes
+*.local
