@@ -64,6 +64,96 @@ export interface ProcesoDistribucionResumenDTO {
     tamanoResumenBytes: number;
 }
 
+// ============================================================================
+// Módulo Ruta
+// ============================================================================
+
+/** Backend: CargaRutaResponseDTO. POST /api/ruta/carga */
+export interface CargaRutaResponseDTO {
+    sesionId: string;
+    fechasDisponibles: string[];
+}
+
+/** Backend: FiltroFechaRequestDTO. POST /api/ruta/{sesionId}/registros */
+export interface FiltroFechaRequestDTO {
+    fechas: string[];
+}
+
+/** Backend: RegistroRutaDTO. Item del listado tras filtrar por fechas. */
+export interface RegistroRutaDTO {
+    vendedorId: number;
+    nombre: string;
+    fecha: string;
+    deudaAnterior: number;
+    numeroFila: number;
+    seneteTotalEnviado: number | null;
+    telebingoTotalEnviado: number | null;
+    refSenete: number | null;
+    refTelb: number | null;
+    devSen: number | null;
+    devTelb: number | null;
+    pago1: number | null;
+    pago2: number | null;
+    nota: string | null;
+}
+
+/** Backend: ExportarRutaRequestDTO. POST /api/ruta/{sesionId}/exportar */
+export interface ExportarRutaRequestDTO {
+    registros: RegistroRutaDTO[];
+}
+
+/** Backend: SesionRutaResponseDTO. Admin: vista listado. */
+export interface SesionRutaResponseDTO {
+    id: number;
+    sesionId: string;
+    fechaFiltro: string;
+    estado: string;
+    totalRegistros: number | null;
+    registrosCompletados: number | null;
+    createdAt: string;
+    createdBy: string;
+}
+
+/** Backend: SesionRutaRegistroResponseDTO. Admin: detalle de registros de una sesión. */
+export interface SesionRutaRegistroResponseDTO {
+    id: number;
+    vendedorNombre: string | null;
+    fecha: string;
+    seneteTotalEnviado: number | null;
+    telebingoTotalEnviado: number | null;
+    refSenete: number | null;
+    refTelb: number | null;
+    devSen: number | null;
+    devTelb: number | null;
+    pago1: number | null;
+    pago2: number | null;
+    nota: string | null;
+    completado: boolean | null;
+    createdAt: string;
+}
+
+/** Backend: EliminarSesionesRequestDTO. DELETE /api/admin/ruta/sesiones (bulk). */
+export interface EliminarSesionesRequestDTO {
+    sesionIds: string[];
+}
+
+/** Backend: ExclusionRutaRequestDTO. POST/PUT /api/admin/ruta/exclusiones[/{id}] */
+export interface ExclusionRutaRequestDTO {
+    nombre: string;
+    descripcion?: string;
+    activo?: boolean;
+}
+
+/** Backend: ExclusionRutaResponseDTO. */
+export interface ExclusionRutaResponseDTO {
+    id: number;
+    nombre: string;
+    descripcion: string | null;
+    activo: boolean;
+    createdAt: string;
+    createdBy: string | null;
+}
+
 // Form types for the wizard
 export interface PoolRangeForm {
     inicio: string;
