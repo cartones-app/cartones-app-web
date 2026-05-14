@@ -4,9 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Loader2, ArrowLeft, Sparkles, RotateCcw } from "lucide-react";
+import { Loader2, ArrowLeft, RotateCcw } from "lucide-react";
 import { WizardStepper } from "@/components/WizardStepper";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { ConfigurationPanel } from "@/components/ConfigurationPanel";
 import { Button } from "@/components/ui/button";
 import { useProcesoStore } from "@/store/useProcesoStore";
@@ -154,36 +153,24 @@ export default function ConfiguracionPage() {
     }
 
     return (
-        <div className="min-h-screen relative overflow-hidden">
-            {/* Background */}
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-background" />
-            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+        <div className="relative overflow-hidden">
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-background" />
+                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+            </div>
 
-            {/* Content */}
-            <div className="relative z-10">
-                {/* Header */}
-                <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-20">
-                    <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Sparkles className="h-6 w-6 text-primary" />
-                            <h1 className="font-semibold text-lg">Gestión de Bingos</h1>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground hidden sm:block">
-                                Proceso: {procesoId?.slice(0, 8)}...
-                            </span>
-                            <Button variant="ghost" size="sm" onClick={handleReset}>
-                                <RotateCcw className="h-4 w-4 mr-2" />
-                                Reiniciar
-                            </Button>
-                            <ThemeToggle />
-                        </div>
-                    </div>
-                </header>
-
-                {/* Wizard Stepper */}
-                <div className="container mx-auto px-4 pt-8">
+            <div className="relative">
+                <div className="container mx-auto px-4 pt-8 flex items-center justify-between gap-2 flex-wrap">
                     <WizardStepper currentStep={2} />
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground hidden sm:block">
+                            Proceso: {procesoId?.slice(0, 8)}...
+                        </span>
+                        <Button variant="ghost" size="sm" onClick={handleReset}>
+                            <RotateCcw className="h-4 w-4 mr-2" />
+                            Reiniciar
+                        </Button>
+                    </div>
                 </div>
 
                 {/* Main Content */}
