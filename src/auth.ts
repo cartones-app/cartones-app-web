@@ -132,11 +132,22 @@ async function doRefresh(token: JWT): Promise<JWT> {
 }
 
 /**
- * Map keyed por refresh token: si dos requests de usuarios DISTINTOS llegan al
- * mismo tiempo con tokens distintos, coalesce cada grupo por separado. Evita
- * que la promise de un usuario contamine la del otro.
+ * Coalescencia + cache TTL por refresh token.
+ *
+ * Problema: la cookie JWT cifrada de Auth.js se actualiza al final de cada
+ * request. Si N requests llegan en serie justo cuando el access token expira,
+ * la primera refresca (RT1 -> RT2, RT1 queda invalidado en KC) y actualiza su
+ * cookie. Pero las siguientes pueden haber leido la cookie ANTES de que la
+ * primera la actualizara — llegan con RT1 ya consumido y reciben `invalid_grant`.
+ *
+ * El Map de promesas en curso solo cubre el caso concurrente puro (todas dentro
+ * del mismo tick). Para el caso secuencial-con-lag de cookies, cacheamos el
+ * RESULTADO por unos segundos: cualquier request que llegue con el viejo RT
+ * dentro del TTL recibe el JWT ya refrescado sin volver a pegarle a Keycloak.
  */
-const refreshPromises = new Map<string, Promise<JWT>>();
+const REFRESH_RESULT_TTL_MS = 30_000;
+type RefreshEntry = { promise: Promise<JWT>; resolvedAt?: number; result?: JWT };
+const refreshCache = new Map<string, RefreshEntry>();
 
 function refreshTokenCoalesced(token: JWT): Promise<JWT> {
   const key = token.refreshToken;
@@ -145,14 +156,31 @@ function refreshTokenCoalesced(token: JWT): Promise<JWT> {
     // RefreshAccessTokenError, lo devolvemos directo.
     return doRefresh(token);
   }
-  const existing = refreshPromises.get(key);
-  if (existing) return existing;
+  const existing = refreshCache.get(key);
+  if (existing) {
+    // Caso 1: refresh todavia en curso -> compartir la promise.
+    // Caso 2: refresh ya termino exitoso y estamos dentro del TTL -> devolver
+    //         el JWT cacheado en lugar de pegarle a KC con un RT muerto.
+    if (existing.result !== undefined) return Promise.resolve(existing.result);
+    return existing.promise;
+  }
 
-  const promise = doRefresh(token).finally(() => {
-    refreshPromises.delete(key);
-  });
-  refreshPromises.set(key, promise);
-  return promise;
+  const entry: RefreshEntry = {
+    promise: doRefresh(token).then((result) => {
+      // Solo cacheamos resultados exitosos. Si fallo, no queremos servir el
+      // error a requests subsiguientes — que reintenten con KC.
+      if (!result.error) {
+        entry.result = result;
+        entry.resolvedAt = Date.now();
+        setTimeout(() => refreshCache.delete(key), REFRESH_RESULT_TTL_MS);
+      } else {
+        refreshCache.delete(key);
+      }
+      return result;
+    }),
+  };
+  refreshCache.set(key, entry);
+  return entry.promise;
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
