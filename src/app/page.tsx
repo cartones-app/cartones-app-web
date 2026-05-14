@@ -6,7 +6,6 @@ import {
     FileSpreadsheet,
     ListChecks,
     Route,
-    Settings,
     ShieldCheck,
     Sparkles,
     type LucideIcon,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight, Menu, X } from "lucide-react";
@@ -14,10 +14,11 @@ import { cn } from "@/lib/utils";
 export function AppShell({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const [mobileOpen, setMobileOpen] = useState(false);
-
-    useEffect(() => {
-        setMobileOpen(false);
-    }, [pathname]);
+    const closeMobile = () => setMobileOpen(false);
+    // El drawer se cierra: al tocar el backdrop, al apretar la X, o al
+    // clickear un item del Sidebar (via onNavigate). No watcheamos pathname
+    // porque las nuevas reglas de react-hooks (purity/set-state-in-effect)
+    // bloquean los patrones para hacerlo sin event handler.
 
     const current = findNavItem(pathname);
     const isHome = pathname === "/";
@@ -33,7 +34,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {mobileOpen && (
                 <div
                     className="fixed inset-0 z-40 md:hidden bg-black/50 backdrop-blur-sm"
-                    onClick={() => setMobileOpen(false)}
+                    onClick={closeMobile}
                     aria-hidden="true"
                 />
             )}
@@ -48,13 +49,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => setMobileOpen(false)}
+                        onClick={closeMobile}
                         aria-label="Cerrar navegación"
                     >
                         <X className="h-4 w-4" />
                     </Button>
                 </div>
-                <Sidebar onNavigate={() => setMobileOpen(false)} />
+                <Sidebar onNavigate={closeMobile} />
             </aside>
 
             <div className="flex flex-1 min-w-0 flex-col">
