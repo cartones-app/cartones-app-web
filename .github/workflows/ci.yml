@@ -8,7 +8,7 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -28,7 +28,7 @@ jobs:
     needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - name: Wait for CodeQL to succeed on this commit
         uses: lewagon/wait-on-check-action@v1.3.4
@@ -44,3 +44,25 @@ jobs:
         run: |
           if [ -z "$HOOK" ]; then echo "Missing VERCEL_DEPLOY_HOOK_URL secret"; exit 1; fi
           curl -fSs -X POST "$HOOK" | head -c 500; echo
+
+      - name: Re-aliasear cartones-app-web-staging.vercel.app al nuevo deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then echo "Missing VERCEL_TOKEN secret"; exit 1; fi
+          # Esperar hasta 10 min a que aparezca un deployment READY para este commit.
+          # Vercel actualmente tiene develop seteado como productionBranch — el deploy
+          # entra como target=production aunque conceptualmente es staging.
+          DEPLOY=""
+          for i in $(seq 1 60); do
+            DEPLOY=$(curl -fsS -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v6/deployments?app=cartones-app-web&state=READY&limit=10" \
+              | jq -r --arg sha "$GITHUB_SHA" '.deployments[] | select(.meta.githubCommitSha == $sha) | .url' | head -n1)
+            if [ -n "$DEPLOY" ]; then break; fi
+            sleep 10
+          done
+          if [ -z "$DEPLOY" ]; then
+            echo "No READY deployment for $GITHUB_SHA after 10 min"; exit 1
+          fi
+          echo "Aliasing https://$DEPLOY -> cartones-app-web-staging.vercel.app"
+          npx --yes vercel@53 alias set "https://$DEPLOY" cartones-app-web-staging.vercel.app --token "$VERCEL_TOKEN"
