@@ -22,6 +22,8 @@ const FECHA_HORA_OPTS: Intl.DateTimeFormatOptions = {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
+    hourCycle: "h23",
 };
 
 const FECHA_HORA_CORTA_OPTS: Intl.DateTimeFormatOptions = {
@@ -29,6 +31,8 @@ const FECHA_HORA_CORTA_OPTS: Intl.DateTimeFormatOptions = {
     month: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
+    hourCycle: "h23",
 };
 
 /**
