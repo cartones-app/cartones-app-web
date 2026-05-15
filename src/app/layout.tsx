@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/components/AuthProvider";
+import { FeatureFlagsProvider } from "@/components/FeatureFlagsProvider";
 import { AppShell } from "@/components/nav/AppShell";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -32,15 +33,17 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-background`}
       >
         <AuthProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="dark"
-            enableSystem
-            disableTransitionOnChange
-          >
-            <AppShell>{children}</AppShell>
-            <Toaster richColors position="top-right" />
-          </ThemeProvider>
+          <FeatureFlagsProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="dark"
+              enableSystem
+              disableTransitionOnChange
+            >
+              <AppShell>{children}</AppShell>
+              <Toaster richColors position="top-right" />
+            </ThemeProvider>
+          </FeatureFlagsProvider>
         </AuthProvider>
       </body>
     </html>

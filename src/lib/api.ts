@@ -6,10 +6,13 @@ import {
     ExclusionRutaResponseDTO,
     ExportarRutaRequestDTO,
     FiltroFechaRequestDTO,
+    FlagViewDTO,
     ProcesoDistribucionResumenDTO,
+    PublicFeatureFlags,
     RegistroRutaDTO,
     SesionRutaRegistroResponseDTO,
     SesionRutaResponseDTO,
+    SetFlagRequest,
     SimulacionRequestDTO,
     VendedorResponseDTO,
     VendedorSimuladoDTO
@@ -233,4 +236,40 @@ export const actualizarExclusion = async (
 /** DELETE /api/admin/ruta/exclusiones/{id} */
 export const eliminarExclusion = async (id: number): Promise<void> => {
     await api.delete(`/api/admin/ruta/exclusiones/${id}`);
+};
+
+// ============================================================================
+// Feature flags — Admin
+// ============================================================================
+
+/** GET /api/admin/feature-flags */
+export const listarFeatureFlags = async (): Promise<FlagViewDTO[]> => {
+    const response = await api.get<FlagViewDTO[]>('/api/admin/feature-flags');
+    return response.data;
+};
+
+/** PUT /api/admin/feature-flags/{flagKey} — crea o actualiza el override. */
+export const setFeatureFlagOverride = async (
+    flagKey: string,
+    body: SetFlagRequest
+): Promise<FlagViewDTO> => {
+    const response = await api.put<FlagViewDTO>(
+        `/api/admin/feature-flags/${encodeURIComponent(flagKey)}`,
+        body
+    );
+    return response.data;
+};
+
+/** DELETE /api/admin/feature-flags/{flagKey} — vuelve al default del YAML. */
+export const clearFeatureFlagOverride = async (flagKey: string): Promise<void> => {
+    await api.delete(`/api/admin/feature-flags/${encodeURIComponent(flagKey)}`);
+};
+
+/**
+ * GET /api/feature-flags — flags públicos (sin rol admin), usados para gating
+ * de páginas del front. Devuelve { "page.upload.enabled": "true", ... }.
+ */
+export const obtenerFlagsPublicos = async (): Promise<PublicFeatureFlags> => {
+    const response = await api.get<PublicFeatureFlags>('/api/feature-flags');
+    return response.data;
 };

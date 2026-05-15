@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { ShieldCheck, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUserPermissions } from "@/lib/auth-utils";
+import { useFeatureFlags } from "@/components/FeatureFlagsProvider";
 import { useProcesoStore } from "@/store/useProcesoStore";
 import { NAV_GROUPS } from "./nav-items";
 
@@ -15,6 +16,7 @@ interface SidebarProps {
 export function Sidebar({ onNavigate }: SidebarProps) {
     const pathname = usePathname();
     const { esAdmin } = useUserPermissions();
+    const { isEnabled } = useFeatureFlags();
     const procesoId = useProcesoStore((s) => s.procesoId);
     const hayProceso = typeof procesoId === "string" && procesoId.length > 0;
 
@@ -43,7 +45,11 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                 {NAV_GROUPS.filter((g) => !g.admin || esAdmin)
                     .map((group) => ({
                         ...group,
-                        items: group.items.filter((i) => !i.requiresProceso || hayProceso),
+                        items: group.items.filter(
+                            (i) =>
+                                (!i.requiresProceso || hayProceso) &&
+                                (!i.flag || isEnabled(i.flag))
+                        ),
                     }))
                     .filter((group) => group.items.length > 0)
                     .map((group) => (

@@ -170,3 +170,35 @@ export interface ConfigurationFormData {
     inicioSeneteGral: string;
     inicioTelebingoGral: string;
 }
+
+// ============================================================================
+// Feature flags (admin)
+// ============================================================================
+
+export type FlagValueType = "BOOLEAN" | "STRING" | "LONG";
+
+/** Backend: FlagViewDTO. GET /api/admin/feature-flags. */
+export interface FlagViewDTO {
+    key: string;
+    type: FlagValueType;
+    description: string;
+    defaultValue: string;
+    effectiveValue: string;
+    hasOverride: boolean;
+    overrideValue: string | null;
+    overrideReason: string | null;
+    modifiedBy: string | null;
+    updatedAt: string | null; // ISO LocalDateTime
+}
+
+/** Backend: SetFlagRequest. PUT /api/admin/feature-flags/{key}. */
+export interface SetFlagRequest {
+    value: string;
+    reason?: string;
+}
+
+/**
+ * Backend: GET /api/feature-flags — map de flag key → valor efectivo serializado.
+ * Solo incluye los flags marcados publicRead=true en el registry.
+ */
+export type PublicFeatureFlags = Record<string, string>;

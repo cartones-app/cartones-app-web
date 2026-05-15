@@ -1,5 +1,6 @@
 import {
     FileSpreadsheet,
+    Flag,
     LayoutDashboard,
     LayoutGrid,
     ListChecks,
@@ -9,6 +10,12 @@ import {
     Users2,
     type LucideIcon,
 } from "lucide-react";
+import {
+    FLAG_PAGE_CONFIGURACION,
+    FLAG_PAGE_MIS_DISTRIBUCIONES,
+    FLAG_PAGE_RUTA,
+    FLAG_PAGE_UPLOAD,
+} from "@/components/FeatureFlagsProvider";
 
 export interface NavItem {
     href: string;
@@ -17,6 +24,12 @@ export interface NavItem {
     icon: LucideIcon;
     /** Si true, el item solo aparece cuando hay un procesoId activo en el store. */
     requiresProceso?: boolean;
+    /**
+     * Clave de feature flag (boolean) que controla la visibilidad del item.
+     * Si el flag es false, el item se oculta del sidebar. Independiente del
+     * gating de la página en sí (ver {@code PageFlagGate}).
+     */
+    flag?: string;
 }
 
 export interface NavGroup {
@@ -45,12 +58,14 @@ export const NAV_GROUPS: NavGroup[] = [
                 title: "Nueva distribución",
                 description: "Subí el Excel de vendedores y simulá la distribución.",
                 icon: FileSpreadsheet,
+                flag: FLAG_PAGE_UPLOAD,
             },
             {
                 href: "/mis-distribuciones",
                 title: "Mis distribuciones",
                 description: "Procesos que generaste — descargá los PDFs.",
                 icon: ListChecks,
+                flag: FLAG_PAGE_MIS_DISTRIBUCIONES,
             },
             {
                 href: "/configuracion",
@@ -58,6 +73,7 @@ export const NAV_GROUPS: NavGroup[] = [
                 description: "Ajustes del simulador de distribución.",
                 icon: Settings,
                 requiresProceso: true,
+                flag: FLAG_PAGE_CONFIGURACION,
             },
         ],
     },
@@ -69,6 +85,7 @@ export const NAV_GROUPS: NavGroup[] = [
                 title: "Recorrido de ruta",
                 description: "Excel de ruta → registros → archivo actualizado.",
                 icon: Route,
+                flag: FLAG_PAGE_RUTA,
             },
         ],
     },
@@ -93,6 +110,12 @@ export const NAV_GROUPS: NavGroup[] = [
                 title: "Exclusiones de ruta",
                 description: "Vendedores y entradas excluidas del filtrado.",
                 icon: ShieldCheck,
+            },
+            {
+                href: "/admin/feature-flags",
+                title: "Feature flags",
+                description: "Activar/desactivar módulos del sistema en runtime.",
+                icon: Flag,
             },
         ],
     },
