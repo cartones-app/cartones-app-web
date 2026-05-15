@@ -63,13 +63,20 @@ export function mapEtiquetasAInputs(
     fechaSorteoTelebingo: string,
     slotsPorPagina: number
 ): Array<Record<string, string>> {
-    if (slotsPorPagina < 1) {
-        throw new Error(`slotsPorPagina debe ser >= 1, recibido: ${slotsPorPagina}`);
+    // Guard estricto: si slotsPorPagina llega como NaN, no-entero o ≤0,
+    // `i += slotsPorPagina` se vuelve un loop infinito que cuelga el browser.
+    if (!Number.isInteger(slotsPorPagina) || slotsPorPagina < 1) {
+        throw new Error(`slotsPorPagina debe ser un entero >= 1, recibido: ${slotsPorPagina}`);
     }
 
     const inputs: Array<Record<string, string>> = [];
     const fechaSenete = formatFechaPdf(fechaSorteoSenete);
     const fechaTelebingo = formatFechaPdf(fechaSorteoTelebingo);
+    // Lista de keys que aparecen en un slot — la usamos para rellenar slots
+    // vacíos con string vacío, garantizando que el record tenga TODAS las
+    // keys que el template del schema podría referenciar. Algunas versiones
+    // de pdfme lanzan si falta una key que el schema declara.
+    const sampleKeys = Object.keys(etiquetaAPlaceholders(VACIO_ETIQUETA));
 
     for (let i = 0; i < etiquetas.length; i += slotsPorPagina) {
         const pagina: Record<string, string> = {
@@ -79,9 +86,12 @@ export function mapEtiquetasAInputs(
         for (let slot = 1; slot <= slotsPorPagina; slot++) {
             const etq = etiquetas[i + slot - 1];
             if (!etq) {
-                // Slots vacíos: dejamos los placeholders vacíos para que el
-                // template no muestre datos viejos. pdfme tolera campos
-                // missing — los renderiza como string vacío.
+                // Rellenar todas las keys del slot con "" — evita que un
+                // schema con field "nombre_3" tire si la última página
+                // solo tiene 1 etiqueta.
+                for (const key of sampleKeys) {
+                    pagina[`${key}_${slot}`] = "";
+                }
                 continue;
             }
             const plano = etiquetaAPlaceholders(etq);
@@ -95,6 +105,18 @@ export function mapEtiquetasAInputs(
     return inputs;
 }
 
+const VACIO_ETIQUETA: EtiquetaInput = {
+    numeroVendedor: 0,
+    nombre: "",
+    saldo: "",
+    seneteRangos: [],
+    seneteCartones: "",
+    resultadoSenete: "",
+    telebingoRangos: [],
+    telebingoCartones: "",
+    resultadoTelebingo: "",
+};
+
 /**
  * Mapea ResumenInput[] a una única fila de inputs con un placeholder
  * {@code tabla} que es un array 2D (filas × columnas) — el field de tipo
@@ -102,6 +124,10 @@ export function mapEtiquetasAInputs(
  *
  * <p>Layout de la tabla: número, nombre, rangos senete (del-al), cantidad
  * senete, rangos telebingo (del-al), cantidad telebingo.
+ *
+ * <p>TODO(post-Fase-1): las columnas están hardcoded acá; si en algún
+ * momento el admin necesita reordenar o agregar/quitar columnas, esto
+ * tiene que pasar a derivarse del schema del template.
  */
 export function mapResumenAInputs(
     resumen: ResumenInput[],
