@@ -34,19 +34,24 @@ export default function AdminFeatureFlagsPage() {
     // sí dispara inmediatamente, porque la UX esperada es instantánea.
     const [drafts, setDrafts] = useState<Record<string, DraftState>>({});
 
+    /** Aplica los datos al estado local. Reutilizable desde el effect (.then) y desde el handler de Recargar. */
+    const hidratar = (data: FlagViewDTO[]) => {
+        setFlags(data);
+        setDrafts(
+            Object.fromEntries(
+                data.map((f) => [
+                    f.key,
+                    { value: f.effectiveValue, reason: f.overrideReason ?? "" },
+                ])
+            )
+        );
+    };
+
     const cargar = async () => {
         setCargando(true);
         try {
             const data = await listarFeatureFlags();
-            setFlags(data);
-            setDrafts(
-                Object.fromEntries(
-                    data.map((f) => [
-                        f.key,
-                        { value: f.effectiveValue, reason: f.overrideReason ?? "" },
-                    ])
-                )
-            );
+            hidratar(data);
         } catch {
             // toast global
         } finally {
@@ -55,7 +60,22 @@ export default function AdminFeatureFlagsPage() {
     };
 
     useEffect(() => {
-        cargar();
+        // setState en el body del effect dispararía react-hooks/set-state-in-effect.
+        // Lo hacemos en callbacks de la promise — corren async, regla feliz.
+        let cancelled = false;
+        listarFeatureFlags()
+            .then((data) => {
+                if (!cancelled) hidratar(data);
+            })
+            .catch(() => {
+                // toast global
+            })
+            .finally(() => {
+                if (!cancelled) setCargando(false);
+            });
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
     const applyResult = (updated: FlagViewDTO) => {

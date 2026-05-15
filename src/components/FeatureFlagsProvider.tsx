@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSession } from "next-auth/react";
 
 import { obtenerFlagsPublicos } from "@/lib/api";
@@ -27,34 +27,62 @@ const FeatureFlagsContext = createContext<FeatureFlagsState | null>(null);
  * pasa a authenticated, dispara el fetch. Si la llamada falla, {@code flags}
  * queda en {} — los gating callers ven default {@code true} y la app no se
  * rompe (fail-open).
+ *
+ * <p><b>Por qué los setState están en callbacks .then/.catch del effect</b>:
+ * la regla {@code react-hooks/set-state-in-effect} prohibe disparar setState
+ * sincrónicamente en el body del effect. Aprovechamos para derivar
+ * {@code flags} de {@code fetched + status} (cuando el usuario se desautentica
+ * no queremos exponer flags cacheados de la sesión previa, pero tampoco
+ * necesitamos un setState para limpiarlos — la derivación basta).
  */
 export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
     const { status } = useSession();
-    const [flags, setFlags] = useState<PublicFeatureFlags>({});
-    const [loading, setLoading] = useState(false);
+    // null = aún no se intentó fetch; {} = intentado (vacío o fallido);
+    // populado = OK. Permite derivar `loading` sin un setState extra.
+    const [fetched, setFetched] = useState<PublicFeatureFlags | null>(null);
 
-    const refresh = useCallback(async () => {
-        if (status !== "authenticated") return;
-        setLoading(true);
-        try {
-            const data = await obtenerFlagsPublicos();
-            setFlags(data);
-        } catch (err) {
-            // fail-open: dejamos flags={} y los callers caen al default true.
-            // Logueamos para que aparezca en consola / Sentry / lo que monitoree el browser.
-            console.error("FeatureFlagsProvider: falló GET /api/feature-flags", err);
-        } finally {
-            setLoading(false);
-        }
+    // Derivado: cuando no estamos autenticados no exponemos ningún flag —
+    // evita leaks entre sesiones sin necesidad de un `setFlags({})` síncrono
+    // en el effect (que rompería la regla react-hooks/set-state-in-effect).
+    // useMemo para que la identidad de `flags` sea estable cuando ni status
+    // ni fetched cambian — si no, el useCallback de isEnabled se invalida en
+    // cada render.
+    const flags: PublicFeatureFlags = useMemo(
+        () => (status === "authenticated" && fetched ? fetched : {}),
+        [status, fetched]
+    );
+    const loading = status === "authenticated" && fetched === null;
+
+    const refresh = useCallback((): Promise<void> => {
+        if (status !== "authenticated") return Promise.resolve();
+        return obtenerFlagsPublicos()
+            .then((data) => {
+                setFetched(data);
+            })
+            .catch((err) => {
+                // fail-open: marcamos como intentado con map vacío y los
+                // callers caen al default true.
+                console.error("FeatureFlagsProvider: falló GET /api/feature-flags", err);
+                setFetched({});
+            });
     }, [status]);
 
     useEffect(() => {
-        if (status === "authenticated") {
-            refresh();
-        } else if (status === "unauthenticated") {
-            setFlags({});
-        }
-    }, [status, refresh]);
+        if (status !== "authenticated") return;
+        let cancelled = false;
+        obtenerFlagsPublicos()
+            .then((data) => {
+                if (!cancelled) setFetched(data);
+            })
+            .catch((err) => {
+                if (cancelled) return;
+                console.error("FeatureFlagsProvider: falló GET /api/feature-flags", err);
+                setFetched({});
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [status]);
 
     const isEnabled = useCallback(
         (key: string, defaultValue = true): boolean => {
