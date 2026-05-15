@@ -1,6 +1,5 @@
 import {
     FileSpreadsheet,
-    FileText,
     Flag,
     LayoutDashboard,
     LayoutGrid,
@@ -117,12 +116,6 @@ export const NAV_GROUPS: NavGroup[] = [
                 title: "Feature flags",
                 description: "Activar/desactivar módulos del sistema en runtime.",
                 icon: Flag,
-            },
-            {
-                href: "/admin/pdf-templates",
-                title: "Templates PDF",
-                description: "Diseñá el layout de etiquetas y resumen.",
-                icon: FileText,
             },
         ],
     },

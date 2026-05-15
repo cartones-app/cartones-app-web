@@ -120,17 +120,6 @@ api.interceptors.response.use(
                 });
                 break;
 
-            case 410:
-                // Gone — recurso existió pero ya no está. Caso típico:
-                // SimulacionCache vacía al pedir /datos para generar PDF.
-                // Mostramos un mensaje accionable (no genérico) para que
-                // el usuario entienda qué tiene que hacer.
-                toast.warning('Datos expirados', {
-                    description: message,
-                    duration: 6000,
-                });
-                break;
-
             case 500:
                 // Server Error
                 toast.error('Error Crítico del Servidor', {
