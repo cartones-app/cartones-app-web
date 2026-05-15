@@ -213,8 +213,16 @@ export default function AdminFeatureFlagsPage() {
                                 key={f.key}
                                 className="rounded-lg border bg-card p-4 sm:p-5 space-y-4"
                             >
-                                <div className="flex flex-wrap items-start justify-between gap-3">
-                                    <div className="min-w-0">
+                                {/*
+                                  No usamos flex-wrap acá — queremos que el Switch
+                                  quede SIEMPRE en la esquina superior derecha, al
+                                  lado del nombre del flag, incluso si la descripción
+                                  o el bloque de badges crece. La columna izquierda
+                                  toma min-w-0 + flex-1 para truncar / envolver
+                                  internamente sin empujar al switch debajo.
+                                */}
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-2 flex-wrap">
                                             <code className="text-sm font-mono font-semibold">
                                                 {f.key}
@@ -237,7 +245,7 @@ export default function AdminFeatureFlagsPage() {
                                         </p>
                                     </div>
                                     {f.type === "BOOLEAN" && (
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 shrink-0">
                                             {isBusy && (
                                                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                                             )}
