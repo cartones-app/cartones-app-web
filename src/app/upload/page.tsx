@@ -24,7 +24,7 @@ const RECIENTES_LIMIT = 4;
 
 const ESTADO_COLOR: Record<string, string> = {
     PENDIENTE: "bg-amber-500/10 text-amber-600 border-amber-500/30",
-    VERIFICANDO: "bg-blue-500/10 text-blue-600 border-blue-500/30",
+    SIMULADO: "bg-blue-500/10 text-blue-600 border-blue-500/30",
     COMPLETADO: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
 };
 
