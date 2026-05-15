@@ -257,6 +257,55 @@ export function PdfDownloader({ procesoId, onBack, onReset }: PdfDownloaderProps
                     </CardContent>
                 </Card>
             )}
+
+            {/*
+              Floating Action Dock — replica el patrón de /configuracion. Las
+              acciones críticas quedan siempre visibles sin tener que scrollear
+              hasta el final de la tabla de resultados.
+            */}
+            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-2xl bg-background/75 backdrop-blur-lg border border-border/40 shadow-xl rounded-full p-2 flex items-center justify-end gap-2">
+                {!isExtracted ? (
+                    <>
+                        <Button
+                            onClick={onBack}
+                            disabled={isLoading}
+                            variant="ghost"
+                            size="sm"
+                            className="rounded-full"
+                        >
+                            <ArrowLeft className="h-4 w-4 mr-2" />
+                            Volver
+                        </Button>
+                        <Button
+                            onClick={handleGenerateFiles}
+                            disabled={isLoading}
+                            size="sm"
+                            className="rounded-full shadow-sm"
+                        >
+                            {isLoading ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Generando...
+                                </>
+                            ) : (
+                                <>
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Generar Archivos
+                                </>
+                            )}
+                        </Button>
+                    </>
+                ) : (
+                    <Button
+                        onClick={onReset}
+                        size="sm"
+                        className="rounded-full shadow-sm"
+                    >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Iniciar Nuevo Proceso
+                    </Button>
+                )}
+            </div>
         </div>
     );
 }

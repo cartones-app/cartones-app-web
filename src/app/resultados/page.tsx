@@ -74,8 +74,8 @@ export default function ResultadosPage() {
                     </div>
                 </div>
 
-                {/* Main Content */}
-                <main className="container mx-auto px-4 py-8 space-y-6">
+                {/* Main Content — pb-24 para que el floating dock de PdfDownloader no tape la última card. */}
+                <main className="container mx-auto px-4 py-8 pb-24 space-y-6">
                     <ResultsTable resultados={resultados} />
 
                     <PdfDownloader
