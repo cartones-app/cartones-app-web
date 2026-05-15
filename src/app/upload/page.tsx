@@ -124,7 +124,15 @@ export default function UploadPage() {
                         </CardHeader>
                         <CardContent className="pt-6">
                             <div className="mx-auto max-w-2xl">
-                                {typeof procesoId === "string" && procesoId ? (
+                                {/*
+                                  Mostramos el banner de "sesión activa" solo cuando NO estamos
+                                  en medio de un upload. Si no, tras subir un Excel nuevo el flujo
+                                  es: setProcesoId → re-render con banner visible → router.push.
+                                  El banner aparece por un instante antes de navegar a /configuracion.
+                                  `isLoading` se mantiene true hasta que la página se desmonta por
+                                  la navegación, así que esta condición lo evita.
+                                */}
+                                {typeof procesoId === "string" && procesoId && !isLoading ? (
                                     <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-5">
                                         <div className="flex items-start gap-3">
                                             <div className="rounded-full bg-amber-500/15 p-2">
