@@ -202,3 +202,92 @@ export interface SetFlagRequest {
  * Solo incluye los flags marcados publicRead=true en el registry.
  */
 export type PublicFeatureFlags = Record<string, string>;
+
+// ============================================================================
+// PDF templates (editor visual)
+// ============================================================================
+
+export type PdfTemplateTipo = "ETIQUETAS" | "RESUMEN";
+
+/** Backend: PdfTemplateResumenDTO. Item del listado admin (sin schemaJson). */
+export interface PdfTemplateResumen {
+    id: string;
+    tipo: PdfTemplateTipo;
+    nombre: string;
+    activo: boolean;
+    /** Slots por página A4 (solo aplica a ETIQUETAS). 3 o 4 típicamente. */
+    slotsPorPagina: number;
+    updatedAt: string; // ISO LocalDateTime
+}
+
+/** Backend: PdfTemplateDetalleDTO. Detalle / edición (incluye schemaJson). */
+export interface PdfTemplateDetalle {
+    id: string;
+    tipo: PdfTemplateTipo;
+    nombre: string;
+    schemaJson: string;
+    activo: boolean;
+    slotsPorPagina: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
+/** Backend: PdfTemplateActiveDTO. Lo que el cliente lee al generar PDFs. */
+export interface PdfTemplateActive {
+    id: string;
+    tipo: PdfTemplateTipo;
+    nombre: string;
+    schemaJson: string;
+    slotsPorPagina: number;
+}
+
+/** Backend: PdfTemplateCreateDTO. */
+export interface PdfTemplateCreateRequest {
+    tipo: PdfTemplateTipo;
+    nombre: string;
+    schemaJson: string;
+    /** Default 3 si no se manda. Valida 1..6 en el backend. */
+    slotsPorPagina?: number;
+}
+
+/** Backend: PdfTemplateUpdateDTO. */
+export interface PdfTemplateUpdateRequest {
+    nombre: string;
+    schemaJson: string;
+    slotsPorPagina?: number;
+}
+
+// ============================================================================
+// Datos del proceso para armar PDFs en el cliente
+// ============================================================================
+
+/** Backend: EtiquetaDTO. Una por vendedor (3 entran en una página A4). */
+export interface EtiquetaInput {
+    numeroVendedor: number;
+    nombre: string;
+    saldo: string;
+    seneteRangos: string[];
+    seneteCartones: string;
+    resultadoSenete: string;
+    telebingoRangos: string[];
+    telebingoCartones: string;
+    resultadoTelebingo: string;
+}
+
+/** Backend: ResumenDTO. Una fila por vendedor en la tabla del resumen. */
+export interface ResumenInput {
+    numeroVendedor: number;
+    nombre: string;
+    seneteDelAl: Record<string, string>;
+    cantidadSenete: number;
+    telebingoDelAl: Record<string, string>;
+    cantidadTelebingo: number;
+}
+
+/** Backend: DistribucionDatosPdfDTO. GET /api/distribuciones/{id}/datos. */
+export interface DistribucionDatosPdf {
+    etiquetas: EtiquetaInput[];
+    resumen: ResumenInput[];
+    fechaSorteoSenete: string; // YYYY-MM-DD
+    fechaSorteoTelebingo: string;
+}

@@ -6,7 +6,14 @@ import {
     ExclusionRutaResponseDTO,
     ExportarRutaRequestDTO,
     FiltroFechaRequestDTO,
+    DistribucionDatosPdf,
     FlagViewDTO,
+    PdfTemplateActive,
+    PdfTemplateCreateRequest,
+    PdfTemplateDetalle,
+    PdfTemplateResumen,
+    PdfTemplateTipo,
+    PdfTemplateUpdateRequest,
     ProcesoDistribucionResumenDTO,
     PublicFeatureFlags,
     RegistroRutaDTO,
@@ -271,5 +278,81 @@ export const clearFeatureFlagOverride = async (flagKey: string): Promise<void> =
  */
 export const obtenerFlagsPublicos = async (): Promise<PublicFeatureFlags> => {
     const response = await api.get<PublicFeatureFlags>('/api/feature-flags');
+    return response.data;
+};
+
+// ============================================================================
+// PDF templates — Admin CRUD
+// ============================================================================
+
+export const listarPdfTemplates = async (): Promise<PdfTemplateResumen[]> => {
+    const response = await api.get<PdfTemplateResumen[]>('/api/admin/pdf-templates');
+    return response.data;
+};
+
+export const obtenerPdfTemplate = async (id: string): Promise<PdfTemplateDetalle> => {
+    const response = await api.get<PdfTemplateDetalle>(
+        `/api/admin/pdf-templates/${encodeURIComponent(id)}`
+    );
+    return response.data;
+};
+
+export const crearPdfTemplate = async (
+    body: PdfTemplateCreateRequest
+): Promise<PdfTemplateDetalle> => {
+    const response = await api.post<PdfTemplateDetalle>('/api/admin/pdf-templates', body);
+    return response.data;
+};
+
+export const actualizarPdfTemplate = async (
+    id: string,
+    body: PdfTemplateUpdateRequest
+): Promise<PdfTemplateDetalle> => {
+    const response = await api.put<PdfTemplateDetalle>(
+        `/api/admin/pdf-templates/${encodeURIComponent(id)}`,
+        body
+    );
+    return response.data;
+};
+
+export const activarPdfTemplate = async (id: string): Promise<PdfTemplateDetalle> => {
+    const response = await api.post<PdfTemplateDetalle>(
+        `/api/admin/pdf-templates/${encodeURIComponent(id)}/activar`
+    );
+    return response.data;
+};
+
+export const eliminarPdfTemplate = async (id: string): Promise<void> => {
+    await api.delete(`/api/admin/pdf-templates/${encodeURIComponent(id)}`);
+};
+
+// ============================================================================
+// PDF templates — endpoint público (autenticado, no admin)
+// ============================================================================
+
+/**
+ * GET /api/pdf-templates/active?tipo= — el cliente lo lee al generar PDFs.
+ */
+export const obtenerPdfTemplateActivo = async (
+    tipo: PdfTemplateTipo
+): Promise<PdfTemplateActive> => {
+    const response = await api.get<PdfTemplateActive>('/api/pdf-templates/active', {
+        params: { tipo },
+    });
+    return response.data;
+};
+
+// ============================================================================
+// Datos del proceso para armar PDFs en el cliente
+// ============================================================================
+
+/**
+ * GET /api/distribuciones/{id}/datos — devuelve etiquetas + resumen + fechas.
+ * Si la simulación se perdió, el backend responde 410 Gone (el cliente debe re-simular).
+ */
+export const obtenerDatosDistribucion = async (procesoId: string): Promise<DistribucionDatosPdf> => {
+    const response = await api.get<DistribucionDatosPdf>(
+        `/api/distribuciones/${encodeURIComponent(procesoId)}/datos`
+    );
     return response.data;
 };
