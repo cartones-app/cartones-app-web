@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { toast } from "sonner";
@@ -29,6 +29,10 @@ export function PdfDownloader({ procesoId, onBack, onReset }: PdfDownloaderProps
     const [isExtracted, setIsExtracted] = useState(false);
     const [hasBeenGenerated, setHasBeenGenerated] = useState(false);
     const [downloadError, setDownloadError] = useState(false);
+    // Apuntamos al banner de éxito para hacer scroll cuando se generan
+    // los archivos — si no, la sección de descarga queda fuera del viewport
+    // y el usuario no se entera de que ya puede bajar los PDFs.
+    const successRef = useRef<HTMLDivElement | null>(null);
 
     const handleGenerateFiles = async () => {
         // Prevent multiple calls - one-shot endpoint
@@ -83,6 +87,13 @@ export function PdfDownloader({ procesoId, onBack, onReset }: PdfDownloaderProps
 
             toast.success("Archivos generados", {
                 description: "Los PDFs están listos para descargar.",
+            });
+
+            // Scroll suave al banner de éxito en el siguiente tick para que
+            // el usuario vea inmediatamente que la generación terminó y dónde
+            // están los botones de descarga.
+            requestAnimationFrame(() => {
+                successRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
             });
         } catch {
             // Error handled by axios interceptor
@@ -174,7 +185,10 @@ export function PdfDownloader({ procesoId, onBack, onReset }: PdfDownloaderProps
                     ) : (
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             {/* Success indicator */}
-                            <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-sm text-emerald-600 dark:text-emerald-400">
+                            <div
+                                ref={successRef}
+                                className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-sm text-emerald-600 dark:text-emerald-400 scroll-mt-24"
+                            >
                                 <p className="flex items-center gap-2">
                                     <CheckCircle2 className="h-4 w-4" />
                                     Archivos listos. Puedes descargarlos las veces que necesites.
@@ -296,14 +310,32 @@ export function PdfDownloader({ procesoId, onBack, onReset }: PdfDownloaderProps
                         </Button>
                     </>
                 ) : (
-                    <Button
-                        onClick={onReset}
-                        size="sm"
-                        className="rounded-full shadow-sm"
-                    >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Iniciar Nuevo Proceso
-                    </Button>
+                    <>
+                        {/*
+                          Post-generación: los botones de descarga viven acá para que el usuario
+                          no tenga que scrollear hasta el card. "Iniciar Nuevo Proceso" queda
+                          solo en la card destacada — es una acción terminal, no urgente.
+                        */}
+                        <Button
+                            onClick={handleDownloadEtiquetas}
+                            disabled={!extractedFiles.etiquetas}
+                            variant="outline"
+                            size="sm"
+                            className="rounded-full shadow-sm"
+                        >
+                            <Tag className="h-4 w-4 mr-2" />
+                            <span className="hidden sm:inline">Descargar</span> Etiquetas
+                        </Button>
+                        <Button
+                            onClick={handleDownloadResumen}
+                            disabled={!extractedFiles.resumen}
+                            size="sm"
+                            className="rounded-full shadow-sm"
+                        >
+                            <FileText className="h-4 w-4 mr-2" />
+                            <span className="hidden sm:inline">Descargar</span> Resumen
+                        </Button>
+                    </>
                 )}
             </div>
         </div>
