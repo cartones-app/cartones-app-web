@@ -12,5 +12,6 @@
 #   optimization en build/runtime. Descarga prebuilts vía install script.
 # - unrs-resolver: resolver Rust de rspack/eslint-config-next. Native binary.
 allowBuilds:
+  core-js: false
   sharp: true
   unrs-resolver: true
