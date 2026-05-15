@@ -30,12 +30,10 @@ import {
     listarSesionesRuta,
 } from "@/lib/api";
 import type { SesionRutaResponseDTO } from "@/types";
-
-const ESTADO_COLOR: Record<string, string> = {
-    ACTIVA: "bg-blue-500/10 text-blue-600 border-blue-500/30",
-    COMPLETADA: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
-    ARCHIVADA: "bg-muted text-muted-foreground border-border",
-};
+import {
+    ESTADO_SESION_RUTA_COLOR,
+    ESTADO_SESION_RUTA_COLOR_FALLBACK,
+} from "@/lib/sesion-ruta-estado";
 
 export default function AdminSesionesRutaPage() {
     const [sesiones, setSesiones] = useState<SesionRutaResponseDTO[]>([]);
@@ -162,8 +160,7 @@ export default function AdminSesionesRutaPage() {
                                     <TableCell>
                                         <span
                                             className={`inline-block px-2 py-0.5 rounded text-xs border ${
-                                                ESTADO_COLOR[s.estado] ??
-                                                "bg-muted text-muted-foreground border-border"
+                                                ESTADO_SESION_RUTA_COLOR[s.estado] ?? ESTADO_SESION_RUTA_COLOR_FALLBACK
                                             }`}
                                         >
                                             {s.estado}

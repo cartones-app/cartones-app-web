@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { FileArchive, FileText, Loader2, Tag } from "lucide-react";
 import { toast } from "sonner";
-import { saveAs } from "file-saver";
 import { Button } from "@/components/ui/button";
 import {
     Table,
@@ -15,31 +14,19 @@ import {
 } from "@/components/ui/table";
 import type { ProcesoDistribucionResumenDTO } from "@/types";
 import { downloadPdfs, downloadPdfsAdmin } from "@/lib/api";
-import { extractPdfsFromZip } from "@/lib/pdf-from-zip";
 import { formatFechaHora } from "@/lib/date-format";
 import { shortId } from "@/lib/format-id";
-
-type DescargaTipo = "etiquetas" | "resumen" | "zip";
+import {
+    ESTADO_PROCESO_COLOR,
+    ESTADO_PROCESO_COLOR_FALLBACK,
+    normalizarEstado,
+} from "@/lib/proceso-estado";
+import { descargarArchivoProceso, type DescargaTipo } from "@/lib/proceso-descarga";
 
 interface DistribucionesTableProps {
     procesos: ProcesoDistribucionResumenDTO[];
     /** Si true, muestra columna createdBy y descarga vía endpoint admin. */
     adminMode?: boolean;
-}
-
-const ESTADO_COLOR: Record<string, string> = {
-    PENDIENTE: "bg-amber-500/10 text-amber-600 border-amber-500/30",
-    SIMULADO: "bg-blue-500/10 text-blue-600 border-blue-500/30",
-    COMPLETADO: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
-};
-
-/**
- * El backend serializa los estados en lowercase (enum EstadoEnum con @JsonValue).
- * Acá normalizamos a UPPERCASE solo para presentación y matching del mapa de
- * colores — así si en algún momento se cambia el case en el backend, no rompe.
- */
-function normalizarEstado(estado: string | undefined | null): string {
-    return (estado ?? "").trim().toUpperCase();
 }
 
 function fmtBytes(bytes: number): string {
@@ -55,29 +42,11 @@ export function DistribucionesTable({ procesos, adminMode = false }: Distribucio
     const handleDescargar = async (procesoId: string, tipo: DescargaTipo) => {
         setDescargando({ id: procesoId, tipo });
         try {
-            const blob = adminMode
-                ? await downloadPdfsAdmin(procesoId)
-                : await downloadPdfs(procesoId);
-
-            const idCorto = procesoId.slice(0, 8);
-            if (tipo === "zip") {
-                saveAs(blob, `distribucion-${idCorto}.zip`);
-            } else {
-                const { etiquetas, resumen } = await extractPdfsFromZip(blob);
-                if (tipo === "etiquetas") {
-                    if (!etiquetas) {
-                        toast.warning("No hay PDF de etiquetas en este proceso.");
-                        return;
-                    }
-                    saveAs(etiquetas, `etiquetas-${idCorto}.pdf`);
-                } else {
-                    if (!resumen) {
-                        toast.warning("No hay PDF de resumen en este proceso.");
-                        return;
-                    }
-                    saveAs(resumen, `resumen-${idCorto}.pdf`);
-                }
-            }
+            await descargarArchivoProceso(
+                procesoId,
+                tipo,
+                adminMode ? downloadPdfsAdmin : downloadPdfs
+            );
             toast.success("Descarga iniciada");
         } catch {
             // El interceptor global ya muestra el toast de error.
@@ -135,9 +104,9 @@ export function DistribucionesTable({ procesos, adminMode = false }: Distribucio
                                         const estado = normalizarEstado(p.estado);
                                         return (
                                             <span
-                                                className={`inline-block px-2 py-0.5 rounded text-xs border ${ESTADO_COLOR[estado] ??
-                                                    "bg-muted text-muted-foreground border-border"
-                                                    }`}
+                                                className={`inline-block px-2 py-0.5 rounded text-xs border ${
+                                                    ESTADO_PROCESO_COLOR[estado] ?? ESTADO_PROCESO_COLOR_FALLBACK
+                                                }`}
                                             >
                                                 {estado}
                                             </span>

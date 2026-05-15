@@ -5,34 +5,24 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { ArrowRight, ChevronRight, Clock, FileArchive, FileText, Loader2, RotateCcw, Tag } from "lucide-react";
-import { saveAs } from "file-saver";
 import { FileUploader } from "@/components/FileUploader";
 import { WizardStepper } from "@/components/WizardStepper";
 import { useProcesoStore } from "@/store/useProcesoStore";
 import { downloadPdfs, listarMisDistribuciones, uploadExcel } from "@/lib/api";
-import { extractPdfsFromZip } from "@/lib/pdf-from-zip";
 import { formatFechaHoraCorta } from "@/lib/date-format";
 import { shortId } from "@/lib/format-id";
+import {
+    ESTADO_PROCESO_COLOR,
+    ESTADO_PROCESO_COLOR_FALLBACK,
+    normalizarEstado,
+} from "@/lib/proceso-estado";
+import { descargarArchivoProceso, type DescargaTipo } from "@/lib/proceso-descarga";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ProcesoDistribucionResumenDTO } from "@/types";
 
-type DescargaTipo = "etiquetas" | "resumen" | "zip";
-
 const RECIENTES_LIMIT = 4;
-
-const ESTADO_COLOR: Record<string, string> = {
-    PENDIENTE: "bg-amber-500/10 text-amber-600 border-amber-500/30",
-    SIMULADO: "bg-blue-500/10 text-blue-600 border-blue-500/30",
-    COMPLETADO: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
-};
-
-// Backend serializa los estados en lowercase (enum @JsonValue). Normalizamos
-// a UPPERCASE solo para presentación y matching del mapa de colores.
-function normalizarEstado(estado: string | undefined | null): string {
-    return (estado ?? "").trim().toUpperCase();
-}
 
 export default function UploadPage() {
     const router = useRouter();
@@ -98,26 +88,7 @@ export default function UploadPage() {
     const handleDescargar = async (procesoId: string, tipo: DescargaTipo) => {
         setDescargando({ id: procesoId, tipo });
         try {
-            const blob = await downloadPdfs(procesoId);
-            const idCorto = procesoId.slice(0, 8);
-            if (tipo === "zip") {
-                saveAs(blob, `distribucion-${idCorto}.zip`);
-            } else {
-                const { etiquetas, resumen } = await extractPdfsFromZip(blob);
-                if (tipo === "etiquetas") {
-                    if (!etiquetas) {
-                        toast.warning("No hay PDF de etiquetas en este proceso.");
-                        return;
-                    }
-                    saveAs(etiquetas, `etiquetas-${idCorto}.pdf`);
-                } else {
-                    if (!resumen) {
-                        toast.warning("No hay PDF de resumen en este proceso.");
-                        return;
-                    }
-                    saveAs(resumen, `resumen-${idCorto}.pdf`);
-                }
-            }
+            await descargarArchivoProceso(procesoId, tipo, downloadPdfs);
         } catch {
             // toast global
         } finally {
@@ -260,8 +231,7 @@ export default function UploadPage() {
                                                         return (
                                                             <span
                                                                 className={`inline-block px-2 py-0.5 rounded text-xs border ${
-                                                                    ESTADO_COLOR[estado] ??
-                                                                    "bg-muted text-muted-foreground border-border"
+                                                                    ESTADO_PROCESO_COLOR[estado] ?? ESTADO_PROCESO_COLOR_FALLBACK
                                                                 }`}
                                                             >
                                                                 {estado}
