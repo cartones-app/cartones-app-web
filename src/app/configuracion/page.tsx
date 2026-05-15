@@ -18,6 +18,22 @@ import {
     VendedorInputDTO,
 } from "@/types";
 
+/**
+ * ISO 'yyyy-MM-dd' → Date en hora local. Round-trip con {@link dateToIso}
+ * es estable porque ambos lados usan el TZ del browser (date-fns format).
+ */
+function isoToDate(iso: string | null): Date | undefined {
+    if (!iso) return undefined;
+    const [y, m, d] = iso.split("-").map(Number);
+    if (!y || !m || !d) return undefined;
+    return new Date(y, m - 1, d);
+}
+
+/** Date → ISO 'yyyy-MM-dd' local-aware. */
+function dateToIso(d: Date | undefined): string | null {
+    return d ? format(d, "yyyy-MM-dd") : null;
+}
+
 export default function ConfiguracionPage() {
     const router = useRouter();
     const {
@@ -27,23 +43,35 @@ export default function ConfiguracionPage() {
         resultados,
         setResultados,
         setCurrentStep,
+        config,
+        patchConfig,
         reset,
     } = useProcesoStore();
 
     const [isLoading, setIsLoading] = useState(true);
     const [isSimulating, setIsSimulating] = useState(false);
-    const [hasSimulated, setHasSimulated] = useState(false);
-    const [showResultsPreview, setShowResultsPreview] = useState(false);
+    // Derivado del store: si hay resultados, ya simulamos. Evita race con la
+    // hidratación async de zustand/persist en el primer render.
+    const hasSimulated = resultados.length > 0;
+    const [showResultsPreview, setShowResultsPreview] = useState(resultados.length > 0);
 
-    // Configuration state
-    const [fechaSorteoSenete, setFechaSorteoSenete] = useState<Date | undefined>(undefined);
-    const [fechaSorteoTelebingo, setFechaSorteoTelebingo] = useState<Date | undefined>(undefined);
-    const [poolSenete, setPoolSenete] = useState<PoolRangeForm[]>([]);
-    const [poolTelebingo, setPoolTelebingo] = useState<PoolRangeForm[]>([]);
-    const [mezclar, setMezclar] = useState(true);
-    const [vendedorInputs, setVendedorInputs] = useState<VendedorInputDTO[]>([]);
-    const [inicioSeneteGral, setInicioSeneteGral] = useState<string>("");
-    const [inicioTelebingoGral, setInicioTelebingoGral] = useState<string>("");
+    // La config vive en el store — al volver desde /resultados los rangos /
+    // terminaciones / fechas siguen ahí. Las fechas se transportan como Date
+    // hacia el panel pero se guardan ISO en el store.
+    const fechaSorteoSenete = isoToDate(config.fechaSorteoSenete);
+    const fechaSorteoTelebingo = isoToDate(config.fechaSorteoTelebingo);
+    const setFechaSorteoSenete = (d: Date | undefined) =>
+        patchConfig({ fechaSorteoSenete: dateToIso(d) });
+    const setFechaSorteoTelebingo = (d: Date | undefined) =>
+        patchConfig({ fechaSorteoTelebingo: dateToIso(d) });
+    const setPoolSenete = (poolSenete: PoolRangeForm[]) => patchConfig({ poolSenete });
+    const setPoolTelebingo = (poolTelebingo: PoolRangeForm[]) =>
+        patchConfig({ poolTelebingo });
+    const setMezclar = (mezclar: boolean) => patchConfig({ mezclar });
+    const setInicioSeneteGral = (inicioSeneteGral: string) =>
+        patchConfig({ inicioSeneteGral });
+    const setInicioTelebingoGral = (inicioTelebingoGral: string) =>
+        patchConfig({ inicioTelebingoGral });
 
     // Redirect if no procesoId
     useEffect(() => {
@@ -58,17 +86,23 @@ export default function ConfiguracionPage() {
             try {
                 const data = await getVendedores(procesoId);
                 setVendedores(data);
-                // Initialize vendedorInputs from the response
-                setVendedorInputs(
-                    data.map((v) => ({
-                        id: v.id,
-                        nombre: v.nombre,
-                        cantidadSenete: v.cantidadSenete,
-                        cantidadTelebingo: v.cantidadTelebingo,
-                        terminacionSenete: null,
-                        terminacionTelebingo: null,
-                    }))
-                );
+                // Solo inicializar vendedorInputs si no hay nada en el store —
+                // si el usuario ya editó terminaciones y vuelve desde /resultados,
+                // no las pisamos. Si cambió el procesoId, setProcesoId() ya hizo
+                // resetConfig() en el store, así que esto queda vacío y se hidrata.
+                const current = useProcesoStore.getState().config.vendedorInputs;
+                if (current.length === 0) {
+                    patchConfig({
+                        vendedorInputs: data.map((v) => ({
+                            id: v.id,
+                            nombre: v.nombre,
+                            cantidadSenete: v.cantidadSenete,
+                            cantidadTelebingo: v.cantidadTelebingo,
+                            terminacionSenete: null,
+                            terminacionTelebingo: null,
+                        })),
+                    });
+                }
             } catch {
                 // Error handled by axios interceptor
             } finally {
@@ -77,16 +111,20 @@ export default function ConfiguracionPage() {
         };
 
         fetchVendedores();
-    }, [procesoId, router, setVendedores]);
+    }, [procesoId, router, setVendedores, patchConfig]);
 
     const handleUpdateVendedor = (
         id: number,
         field: keyof VendedorInputDTO,
         value: number | null | undefined
     ) => {
-        setVendedorInputs((prev) =>
-            prev.map((v) => (v.id === id ? { ...v, [field]: value } : v))
-        );
+        // getState() en vez del `config` del closure: este handler se pasa al
+        // panel hijo y podría ejecutarse con un `config` viejo si React no
+        // re-renderiza entre keystrokes consecutivos. Leemos siempre fresco.
+        const current = useProcesoStore.getState().config.vendedorInputs;
+        patchConfig({
+            vendedorInputs: current.map((v) => (v.id === id ? { ...v, [field]: value } : v)),
+        });
     };
 
     const handleSimular = async () => {
@@ -95,22 +133,21 @@ export default function ConfiguracionPage() {
             return ranges
                 .filter((r) => r.inicio && r.fin)
                 .map((r) => ({
-                    inicio: parseInt(r.inicio),
-                    fin: parseInt(r.fin),
+                    inicio: Number.parseInt(r.inicio),
+                    fin: Number.parseInt(r.fin),
                 }));
         };
 
         const request: SimulacionRequestDTO = {
-            poolSenete: parseRanges(poolSenete),
-            poolTelebingo: parseRanges(poolTelebingo),
-            vendedores: vendedorInputs,
-            mezclar,
-            // Send null if no date selected, not empty string
-            fechaSorteoSenete: fechaSorteoSenete ? format(fechaSorteoSenete, "yyyy-MM-dd") : null,
-            fechaSorteoTelebingo: fechaSorteoTelebingo ? format(fechaSorteoTelebingo, "yyyy-MM-dd") : null,
+            poolSenete: parseRanges(config.poolSenete),
+            poolTelebingo: parseRanges(config.poolTelebingo),
+            vendedores: config.vendedorInputs,
+            mezclar: config.mezclar,
+            fechaSorteoSenete: config.fechaSorteoSenete,
+            fechaSorteoTelebingo: config.fechaSorteoTelebingo,
             // CRITICAL: Use correct JSON keys for backend @JsonProperty mapping
-            inicioSenete: inicioSeneteGral ? parseInt(inicioSeneteGral) : 0,
-            inicioTelebingo: inicioTelebingoGral ? parseInt(inicioTelebingoGral) : 0,
+            inicioSenete: config.inicioSeneteGral ? Number.parseInt(config.inicioSeneteGral) : 0,
+            inicioTelebingo: config.inicioTelebingoGral ? Number.parseInt(config.inicioTelebingoGral) : 0,
         };
 
         setIsSimulating(true);
@@ -118,7 +155,7 @@ export default function ConfiguracionPage() {
             const resultados = await simularDistribucion(procesoId!, request);
             setResultados(resultados);
             setCurrentStep(3);
-            setHasSimulated(true);
+            // hasSimulated se deriva de resultados.length, ya quedó implícito.
             setShowResultsPreview(true);
             toast.success("Simulación completada", {
                 description: "Revisa los resultados asignados en la tabla inferior.",
@@ -181,15 +218,15 @@ export default function ConfiguracionPage() {
                         setFechaSorteoSenete={setFechaSorteoSenete}
                         fechaSorteoTelebingo={fechaSorteoTelebingo}
                         setFechaSorteoTelebingo={setFechaSorteoTelebingo}
-                        poolSenete={poolSenete}
+                        poolSenete={config.poolSenete}
                         setPoolSenete={setPoolSenete}
-                        poolTelebingo={poolTelebingo}
+                        poolTelebingo={config.poolTelebingo}
                         setPoolTelebingo={setPoolTelebingo}
-                        mezclar={mezclar}
+                        mezclar={config.mezclar}
                         setMezclar={setMezclar}
-                        inicioSeneteGral={inicioSeneteGral}
+                        inicioSeneteGral={config.inicioSeneteGral}
                         setInicioSeneteGral={setInicioSeneteGral}
-                        inicioTelebingoGral={inicioTelebingoGral}
+                        inicioTelebingoGral={config.inicioTelebingoGral}
                         setInicioTelebingoGral={setInicioTelebingoGral}
                         onSimular={handleSimular}
                         isSimulating={isSimulating}
@@ -197,7 +234,7 @@ export default function ConfiguracionPage() {
                         onVerResultados={handleVerResultados}
                         // Data Props
                         vendedores={vendedores}
-                        vendedorInputs={vendedorInputs}
+                        vendedorInputs={config.vendedorInputs}
                         onUpdateVendedor={handleUpdateVendedor}
                         resultados={resultados}
                         showResultsPreview={showResultsPreview}
