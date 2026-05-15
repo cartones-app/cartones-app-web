@@ -4,17 +4,21 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowRight, ChevronRight, Clock, Download, FileText, Loader2, RotateCcw } from "lucide-react";
+import { ArrowRight, ChevronRight, Clock, FileArchive, FileText, Loader2, RotateCcw, Tag } from "lucide-react";
 import { saveAs } from "file-saver";
 import { FileUploader } from "@/components/FileUploader";
 import { WizardStepper } from "@/components/WizardStepper";
 import { useProcesoStore } from "@/store/useProcesoStore";
 import { downloadPdfs, listarMisDistribuciones, uploadExcel } from "@/lib/api";
+import { extractPdfsFromZip } from "@/lib/pdf-from-zip";
 import { formatFechaHoraCorta } from "@/lib/date-format";
+import { shortId } from "@/lib/format-id";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ProcesoDistribucionResumenDTO } from "@/types";
+
+type DescargaTipo = "etiquetas" | "resumen" | "zip";
 
 const RECIENTES_LIMIT = 4;
 
@@ -23,6 +27,12 @@ const ESTADO_COLOR: Record<string, string> = {
     VERIFICANDO: "bg-blue-500/10 text-blue-600 border-blue-500/30",
     COMPLETADO: "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
 };
+
+// Backend serializa los estados en lowercase (enum @JsonValue). Normalizamos
+// a UPPERCASE solo para presentación y matching del mapa de colores.
+function normalizarEstado(estado: string | undefined | null): string {
+    return (estado ?? "").trim().toUpperCase();
+}
 
 export default function UploadPage() {
     const router = useRouter();
@@ -42,7 +52,7 @@ export default function UploadPage() {
 
     const [recientes, setRecientes] = useState<ProcesoDistribucionResumenDTO[]>([]);
     const [cargandoRecientes, setCargandoRecientes] = useState(true);
-    const [descargandoId, setDescargandoId] = useState<string | null>(null);
+    const [descargando, setDescargando] = useState<{ id: string; tipo: DescargaTipo } | null>(null);
 
     useEffect(() => {
         listarMisDistribuciones()
@@ -60,8 +70,8 @@ export default function UploadPage() {
             const procesoId = await uploadExcel(file);
             setProcesoId(procesoId);
             setCurrentStep(2);
-            toast.success("Archivo cargado exitosamente", {
-                description: `Proceso ID: ${procesoId}`,
+            toast.success("Archivo cargado", {
+                description: "Listo para configurar la distribución.",
             });
             router.push("/configuracion");
         } catch {
@@ -85,17 +95,38 @@ export default function UploadPage() {
         toast.info("Sesión reiniciada");
     };
 
-    const handleDescargar = async (procesoId: string) => {
-        setDescargandoId(procesoId);
+    const handleDescargar = async (procesoId: string, tipo: DescargaTipo) => {
+        setDescargando({ id: procesoId, tipo });
         try {
             const blob = await downloadPdfs(procesoId);
-            saveAs(blob, `distribucion-${procesoId.slice(0, 8)}.zip`);
+            const idCorto = procesoId.slice(0, 8);
+            if (tipo === "zip") {
+                saveAs(blob, `distribucion-${idCorto}.zip`);
+            } else {
+                const { etiquetas, resumen } = await extractPdfsFromZip(blob);
+                if (tipo === "etiquetas") {
+                    if (!etiquetas) {
+                        toast.warning("No hay PDF de etiquetas en este proceso.");
+                        return;
+                    }
+                    saveAs(etiquetas, `etiquetas-${idCorto}.pdf`);
+                } else {
+                    if (!resumen) {
+                        toast.warning("No hay PDF de resumen en este proceso.");
+                        return;
+                    }
+                    saveAs(resumen, `resumen-${idCorto}.pdf`);
+                }
+            }
         } catch {
             // toast global
         } finally {
-            setDescargandoId(null);
+            setDescargando(null);
         }
     };
+
+    const isBusy = (procesoId: string, tipo: DescargaTipo) =>
+        descargando?.id === procesoId && descargando?.tipo === tipo;
 
     return (
         <div className="relative overflow-hidden">
@@ -135,7 +166,7 @@ export default function UploadPage() {
                                                 <p className="text-sm text-amber-800/80 dark:text-amber-300/80 mt-1">
                                                     Proceso{" "}
                                                     <span className="font-mono">
-                                                        {procesoId.slice(0, 8)}…
+                                                        {shortId(procesoId)}
                                                     </span>
                                                     . Continuá donde la dejaste o reiniciá para
                                                     subir otro Excel.
@@ -222,34 +253,70 @@ export default function UploadPage() {
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-mono text-xs text-muted-foreground truncate">
-                                                        {p.procesoId.slice(0, 8)}…
+                                                        {shortId(p.procesoId)}
                                                     </span>
-                                                    <span
-                                                        className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider border ${
-                                                            ESTADO_COLOR[p.estado] ??
-                                                            "bg-muted text-muted-foreground border-border"
-                                                        }`}
-                                                    >
-                                                        {p.estado}
-                                                    </span>
+                                                    {(() => {
+                                                        const estado = normalizarEstado(p.estado);
+                                                        return (
+                                                            <span
+                                                                className={`inline-block px-2 py-0.5 rounded text-xs border ${
+                                                                    ESTADO_COLOR[estado] ??
+                                                                    "bg-muted text-muted-foreground border-border"
+                                                                }`}
+                                                            >
+                                                                {estado}
+                                                            </span>
+                                                        );
+                                                    })()}
                                                 </div>
                                                 <div className="text-xs text-muted-foreground mt-0.5">
                                                     {formatFechaHoraCorta(p.createdAt)}
                                                 </div>
                                             </div>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                disabled={!puedeDescargar || descargandoId === p.procesoId}
-                                                onClick={() => handleDescargar(p.procesoId)}
-                                                aria-label="Descargar ZIP"
-                                            >
-                                                {descargandoId === p.procesoId ? (
-                                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                                ) : (
-                                                    <Download className="h-4 w-4" />
-                                                )}
-                                            </Button>
+                                            <div className="inline-flex items-center gap-1">
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    disabled={!p.tieneEtiquetas || isBusy(p.procesoId, "etiquetas")}
+                                                    onClick={() => handleDescargar(p.procesoId, "etiquetas")}
+                                                    title="Descargar solo etiquetas (PDF)"
+                                                    aria-label="Descargar etiquetas"
+                                                >
+                                                    {isBusy(p.procesoId, "etiquetas") ? (
+                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                    ) : (
+                                                        <Tag className="h-4 w-4" />
+                                                    )}
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    disabled={!p.tieneResumen || isBusy(p.procesoId, "resumen")}
+                                                    onClick={() => handleDescargar(p.procesoId, "resumen")}
+                                                    title="Descargar solo resumen (PDF)"
+                                                    aria-label="Descargar resumen"
+                                                >
+                                                    {isBusy(p.procesoId, "resumen") ? (
+                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                    ) : (
+                                                        <FileText className="h-4 w-4" />
+                                                    )}
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    disabled={!puedeDescargar || isBusy(p.procesoId, "zip")}
+                                                    onClick={() => handleDescargar(p.procesoId, "zip")}
+                                                    title="Descargar ZIP completo"
+                                                    aria-label="Descargar ZIP"
+                                                >
+                                                    {isBusy(p.procesoId, "zip") ? (
+                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                    ) : (
+                                                        <FileArchive className="h-4 w-4" />
+                                                    )}
+                                                </Button>
+                                            </div>
                                         </div>
                                     );
                                 })}
