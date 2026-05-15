@@ -126,9 +126,10 @@ export default function EditarPdfTemplatePage() {
                 }
             />
 
-            <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-                {/* Editor */}
-                <div className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+                {/* Editor — min-w-0 evita que el Designer estire el grid si pdfme
+                    intenta crecer por su contenido. */}
+                <div className="space-y-4 min-w-0">
                     <div className="grid sm:grid-cols-[1fr_auto] gap-3 items-end">
                         <div className="grid gap-1.5">
                             <Label htmlFor="t-nombre">Nombre</Label>
