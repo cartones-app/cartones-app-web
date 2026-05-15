@@ -8,8 +8,6 @@
  * el backend, alcanza con tocar {@link normalizarEstado}.
  */
 
-export type EstadoProceso = "PENDIENTE" | "SIMULADO" | "COMPLETADO";
-
 /** Clases tailwind por estado. Usá `ESTADO_PROCESO_COLOR[normalizarEstado(s)] ?? FALLBACK_COLOR`. */
 export const ESTADO_PROCESO_COLOR: Record<string, string> = {
     PENDIENTE: "bg-amber-500/10 text-amber-600 border-amber-500/30",

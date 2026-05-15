@@ -42,12 +42,17 @@ export function DistribucionesTable({ procesos, adminMode = false }: Distribucio
     const handleDescargar = async (procesoId: string, tipo: DescargaTipo) => {
         setDescargando({ id: procesoId, tipo });
         try {
-            await descargarArchivoProceso(
+            const ok = await descargarArchivoProceso(
                 procesoId,
                 tipo,
                 adminMode ? downloadPdfsAdmin : downloadPdfs
             );
-            toast.success("Descarga iniciada");
+            // Solo confirmamos cuando hubo descarga real. Si el ZIP no tenía
+            // el PDF pedido el helper ya mostró un toast.warning — no agregar
+            // un "Descarga iniciada" encima sería contradictorio.
+            if (ok) {
+                toast.success("Descarga iniciada");
+            }
         } catch {
             // El interceptor global ya muestra el toast de error.
         } finally {

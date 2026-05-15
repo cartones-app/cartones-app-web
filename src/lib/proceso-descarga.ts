@@ -13,38 +13,43 @@ export type DescargaTipo = "etiquetas" | "resumen" | "zip";
  * para que el helper no conozca el endpoint — usa el que corresponde según
  * el contexto (DISTRIBUIDOR vs ADMIN, etc.).
  *
- * <p>Errores: los errores HTTP los muestra el interceptor axios global, así
- * que acá solo lanzamos para que el caller maneje su propio loading state.
- * Los casos de "ZIP descargado pero no contiene el PDF pedido" se reportan
- * como `toast.warning` (no es un error técnico, es un dato faltante esperable).
+ * <p><b>Retorno</b>: {@code true} si la descarga efectivamente se gatilló
+ * (el {@code saveAs} corrió). {@code false} si el ZIP descargado no contenía
+ * el PDF pedido — en ese caso ya se mostró un {@code toast.warning} desde
+ * acá y el caller debería evitar mostrar un toast de éxito contradictorio.
+ *
+ * <p><b>Errores</b>: los errores HTTP los muestra el interceptor axios
+ * global; acá los re-lanzamos para que el caller maneje su propio loading
+ * state via try/catch.
  */
 export async function descargarArchivoProceso(
     procesoId: string,
     tipo: DescargaTipo,
     fetchBlob: (procesoId: string) => Promise<Blob>
-): Promise<void> {
+): Promise<boolean> {
     const blob = await fetchBlob(procesoId);
     const idCorto = procesoId.slice(0, 8);
 
     if (tipo === "zip") {
         saveAs(blob, `distribucion-${idCorto}.zip`);
-        return;
+        return true;
     }
 
     const { etiquetas, resumen } = await extractPdfsFromZip(blob);
     if (tipo === "etiquetas") {
         if (!etiquetas) {
             toast.warning("No hay PDF de etiquetas en este proceso.");
-            return;
+            return false;
         }
         saveAs(etiquetas, `etiquetas-${idCorto}.pdf`);
-        return;
+        return true;
     }
 
     // tipo === "resumen"
     if (!resumen) {
         toast.warning("No hay PDF de resumen en este proceso.");
-        return;
+        return false;
     }
     saveAs(resumen, `resumen-${idCorto}.pdf`);
+    return true;
 }
