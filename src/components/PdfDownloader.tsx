@@ -67,8 +67,22 @@ export function PdfDownloader({ procesoId, onBack, onReset }: PdfDownloaderProps
             requestAnimationFrame(() => {
                 successRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
             });
-        } catch {
-            // El interceptor global ya mostró el error de HTTP. Mostramos el banner.
+        } catch (err) {
+            // El interceptor global muestra el toast HTTP, pero los errores de
+            // pdfme (template malo, runtime) no pasan por axios — hay que
+            // surfacearlos acá. Logueamos siempre para diagnóstico y mostramos
+            // toast con el mensaje real si no vino de HTTP.
+            console.error("PdfDownloader: falló handleGenerateFiles", err);
+            const message = err instanceof Error ? err.message : String(err);
+            // Heurística: si el error parece venir del axios interceptor
+            // (objeto AxiosError, ya tiene su toast), no duplicar.
+            const isAxiosError = err && typeof err === "object" && "isAxiosError" in err;
+            if (!isAxiosError) {
+                toast.error("No se pudo generar el PDF", {
+                    description: message,
+                    duration: 8000,
+                });
+            }
             setDownloadError(true);
         } finally {
             setIsLoading(false);

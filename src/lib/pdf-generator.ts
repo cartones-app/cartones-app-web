@@ -29,16 +29,18 @@ function formatFechaPdf(iso: string | null | undefined): string {
  * cuando configure el text field en el Designer.
  */
 function etiquetaAPlaceholders(e: EtiquetaInput): Record<string, string> {
+    // Formato pre-aplicado a algunos campos para que el template no tenga que
+    // concatenar (pdfme no soporta string interp dentro de un text field).
     return {
-        numeroVendedor: String(e.numeroVendedor),
-        nombre: e.nombre,
-        saldo: e.saldo,
+        numeroVendedor: e.numeroVendedor > 0 ? `#${e.numeroVendedor}` : "",
+        nombre: (e.nombre || "").toUpperCase(),
+        saldo: e.saldo ? `Gs. ${e.saldo}` : "Gs. 0",
         seneteRangos: e.seneteRangos.join("\n"),
-        seneteCartones: e.seneteCartones,
-        resultadoSenete: e.resultadoSenete,
+        seneteCartones: e.seneteCartones ? `TOTAL: ${e.seneteCartones}` : "",
+        resultadoSenete: e.resultadoSenete || "0",
         telebingoRangos: e.telebingoRangos.join("\n"),
-        telebingoCartones: e.telebingoCartones,
-        resultadoTelebingo: e.resultadoTelebingo,
+        telebingoCartones: e.telebingoCartones ? `TOTAL: ${e.telebingoCartones}` : "",
+        resultadoTelebingo: e.resultadoTelebingo || "0",
     };
 }
 
@@ -168,15 +170,25 @@ export async function generarPdfBlob(
     schemaJson: string,
     inputs: Array<Record<string, unknown>>
 ): Promise<Blob> {
+    const { BLANK_PDF } = await import("@pdfme/common");
     const { generate } = await import("@pdfme/generator");
     const { text, table } = await import("@pdfme/schemas");
 
-    let template: Parameters<typeof generate>[0]["template"];
+    type TemplateLike = Parameters<typeof generate>[0]["template"] & { basePdf: string };
+    let template: TemplateLike;
     try {
-        template = JSON.parse(schemaJson);
+        template = JSON.parse(schemaJson) as TemplateLike;
     } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         throw new Error(`Template inválido (JSON no parsea): ${msg}`);
+    }
+
+    // Normalizar el placeholder "BLANK_PDF" → constante real de @pdfme/common.
+    // El seed lo guarda como string literal (no podemos referenciar la
+    // constante desde un SQL). Sin esta normalización, pdfme intenta tratar
+    // "BLANK_PDF" como URL y tira "Invalid or unsafe URL for basePdf".
+    if (!template.basePdf || template.basePdf === "BLANK_PDF") {
+        template.basePdf = BLANK_PDF;
     }
 
     const pdf = await generate({
