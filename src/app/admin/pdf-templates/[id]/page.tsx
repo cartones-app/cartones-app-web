@@ -156,6 +156,10 @@ export default function EditarPdfTemplatePage() {
                     </div>
 
                     <PdfTemplateDesigner
+                        // key={template.id} fuerza remount si Next reutiliza
+                        // el componente entre rutas /[id]/ distintas. Sin esto,
+                        // el Designer queda atascado con el schema del primer mount.
+                        key={template.id}
                         initialSchemaJson={schemaJson}
                         onTemplateChange={setSchemaJson}
                         height={650}
