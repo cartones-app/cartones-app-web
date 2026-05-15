@@ -36,11 +36,37 @@ function etiquetaAPlaceholders(e: EtiquetaInput): Record<string, string> {
         nombre: (e.nombre || "").toUpperCase(),
         saldo: e.saldo ? `Gs. ${e.saldo}` : "Gs. 0",
         seneteRangos: e.seneteRangos.join("\n"),
-        seneteCartones: e.seneteCartones ? `TOTAL: ${e.seneteCartones}` : "",
+        seneteCartones: e.seneteCartones ? `TOTAL ----------> (${e.seneteCartones})` : "",
         resultadoSenete: e.resultadoSenete || "0",
         telebingoRangos: e.telebingoRangos.join("\n"),
-        telebingoCartones: e.telebingoCartones ? `TOTAL: ${e.telebingoCartones}` : "",
+        telebingoCartones: e.telebingoCartones ? `TOTAL ----------> (${e.telebingoCartones})` : "",
         resultadoTelebingo: e.resultadoTelebingo || "0",
+    };
+}
+
+/**
+ * Construye las dos líneas de fecha que van en cada etiqueta. Replica la
+ * lógica condicional del PDF viejo (`fechaSenete.isEqual(fechaTelebingo)`):
+ * cuando las fechas coinciden, una sola línea "SORTEO: <fecha>" y la segunda
+ * queda vacía; cuando difieren, una línea por sorteo.
+ *
+ * <p>El template tiene 2 fields {@code fechaSorteoSenete_N} y
+ * {@code fechaSorteoTelebingo_N} — el mapper inyecta el TEXTO COMPLETO
+ * (incluye label). pdfme no tiene rendering condicional dentro del schema,
+ * por eso lo resolvemos en el cliente.
+ */
+function lineasFechaEtiqueta(
+    fechaSenete: string,
+    fechaTelebingo: string
+): { fechaSorteoSenete: string; fechaSorteoTelebingo: string } {
+    const senete = formatFechaPdf(fechaSenete);
+    const telebingo = formatFechaPdf(fechaTelebingo);
+    if (fechaSenete && fechaSenete === fechaTelebingo) {
+        return { fechaSorteoSenete: `SORTEO: ${senete}`, fechaSorteoTelebingo: "" };
+    }
+    return {
+        fechaSorteoSenete: senete ? `SORTEO SENETÉ: ${senete}` : "",
+        fechaSorteoTelebingo: telebingo ? `SORTEO TELEBINGO: ${telebingo}` : "",
     };
 }
 
@@ -51,13 +77,10 @@ function etiquetaAPlaceholders(e: EtiquetaInput): Record<string, string> {
  * <p>El valor de {@code slotsPorPagina} viene del template activo en el backend
  * (el admin lo elige al editar). Soporta 3 (layout original) y 4 (más compacto).
  *
- * <p>Ejemplo con 5 etiquetas y slots=3:
- *   página 1: {nombre_1, nombre_2, nombre_3, saldo_1, ...}
- *   página 2: {nombre_1, nombre_2, fechas, ...}  (slot 3 vacío)
- *
  * <p>El template del admin debe usar fields con nombres {@code nombre_1},
  * {@code nombre_2}, etc. hasta {@code nombre_N} donde N=slotsPorPagina.
- * La fecha es global a la página.
+ * Las fechas también son por slot ({@code fechaSorteoSenete_1}, etc) porque
+ * el mapper aplica lógica condicional según si coinciden o no.
  */
 export function mapEtiquetasAInputs(
     etiquetas: EtiquetaInput[],
@@ -72,8 +95,7 @@ export function mapEtiquetasAInputs(
     }
 
     const inputs: Array<Record<string, string>> = [];
-    const fechaSenete = formatFechaPdf(fechaSorteoSenete);
-    const fechaTelebingo = formatFechaPdf(fechaSorteoTelebingo);
+    const fechas = lineasFechaEtiqueta(fechaSorteoSenete, fechaSorteoTelebingo);
     // Lista de keys que aparecen en un slot — la usamos para rellenar slots
     // vacíos con string vacío, garantizando que el record tenga TODAS las
     // keys que el template del schema podría referenciar. Algunas versiones
@@ -81,16 +103,14 @@ export function mapEtiquetasAInputs(
     const sampleKeys = Object.keys(etiquetaAPlaceholders(VACIO_ETIQUETA));
 
     for (let i = 0; i < etiquetas.length; i += slotsPorPagina) {
-        const pagina: Record<string, string> = {
-            fechaSorteoSenete: fechaSenete,
-            fechaSorteoTelebingo: fechaTelebingo,
-        };
+        const pagina: Record<string, string> = {};
         for (let slot = 1; slot <= slotsPorPagina; slot++) {
+            // Fechas por slot — repetidas idénticas en todos los slots de la página.
+            pagina[`fechaSorteoSenete_${slot}`] = fechas.fechaSorteoSenete;
+            pagina[`fechaSorteoTelebingo_${slot}`] = fechas.fechaSorteoTelebingo;
+
             const etq = etiquetas[i + slot - 1];
             if (!etq) {
-                // Rellenar todas las keys del slot con "" — evita que un
-                // schema con field "nombre_3" tire si la última página
-                // solo tiene 1 etiqueta.
                 for (const key of sampleKeys) {
                     pagina[`${key}_${slot}`] = "";
                 }
@@ -124,8 +144,15 @@ const VACIO_ETIQUETA: EtiquetaInput = {
  * {@code tabla} que es un array 2D (filas × columnas) — el field de tipo
  * {@code table} de pdfme lo consume directamente.
  *
- * <p>Layout de la tabla: número, nombre, rangos senete (del-al), cantidad
- * senete, rangos telebingo (del-al), cantidad telebingo.
+ * <p>Replica la lógica condicional del PDF viejo: cuando ambas fechas
+ * coinciden, el título incluye la fecha ("RESUMEN DE ENTREGA - dd/MM/yyyy")
+ * y las líneas separadas de Senete/Telebingo quedan vacías. Cuando difieren,
+ * el título es solo "RESUMEN DE ENTREGA" y las dos líneas muestran cada
+ * fecha.
+ *
+ * <p>Layout de la tabla del PDF viejo (orden de columnas): número, nombre,
+ * rangos senete (del-al), cantidad senete, rangos telebingo (del-al),
+ * cantidad telebingo.
  *
  * <p>TODO(post-Fase-1): las columnas están hardcoded acá; si en algún
  * momento el admin necesita reordenar o agregar/quitar columnas, esto
@@ -137,26 +164,52 @@ export function mapResumenAInputs(
     fechaSorteoTelebingo: string
 ): Array<Record<string, unknown>> {
     const filas: string[][] = resumen.map((r) => [
-        String(r.numeroVendedor),
-        r.nombre,
+        `#${r.numeroVendedor}`,
+        truncarNombre(r.nombre),
         formatRangos(r.seneteDelAl),
-        String(r.cantidadSenete),
         formatRangos(r.telebingoDelAl),
+        String(r.cantidadSenete),
         String(r.cantidadTelebingo),
     ]);
+
+    const senete = formatFechaPdf(fechaSorteoSenete);
+    const telebingo = formatFechaPdf(fechaSorteoTelebingo);
+    // `!!` para que el tipo sea boolean — sin esto el `&&` devuelve `string | false`.
+    const fechasIguales: boolean = !!fechaSorteoSenete && fechaSorteoSenete === fechaSorteoTelebingo;
+
     return [
         {
-            fechaSorteoSenete: formatFechaPdf(fechaSorteoSenete),
-            fechaSorteoTelebingo: formatFechaPdf(fechaSorteoTelebingo),
+            tituloResumen: fechasIguales
+                ? `RESUMEN DE ENTREGA - ${senete}`
+                : "RESUMEN DE ENTREGA",
+            fechaSorteoSenete: fechasIguales ? "" : (senete ? `SENETÉ: ${senete}` : ""),
+            fechaSorteoTelebingo: fechasIguales ? "" : (telebingo ? `TELEBINGO: ${telebingo}` : ""),
             tabla: filas,
         },
     ];
 }
 
-/** Formatea { "100": "150", "200": "230" } → "100-150\n200-230". */
+/** Trunca a 30 chars + "..." — replica el LIMITE_CARACTERES del PDF viejo. */
+function truncarNombre(nombre: string | null | undefined): string {
+    if (!nombre) return "";
+    const upper = nombre.toUpperCase();
+    return upper.length <= 30 ? upper : upper.slice(0, 27) + "...";
+}
+
+/**
+ * Formatea { "100": "150", "200": "230" } → "100 - 150\n200 - 230".
+ *
+ * <p>Ordena las keys lexicográficamente como el PDF viejo (`Collections.sort`
+ * sobre `List<String>` en Java). Heads-up: con keys numéricas de longitud
+ * variable el orden lexicográfico difiere del numérico ("100" < "20" < "200"
+ * < "30"). En los casos reales de la app cada vendedor suele tener un único
+ * rango, así que no se nota. Si en el futuro hay multi-rango con números de
+ * distinto largo, cambiar a comparación numérica.
+ */
 function formatRangos(delAl: Record<string, string>): string {
     return Object.entries(delAl)
-        .map(([desde, hasta]) => `${desde}-${hasta}`)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([desde, hasta]) => `${desde} - ${hasta}`)
         .join("\n");
 }
 
@@ -172,7 +225,7 @@ export async function generarPdfBlob(
 ): Promise<Blob> {
     const { BLANK_PDF } = await import("@pdfme/common");
     const { generate } = await import("@pdfme/generator");
-    const { text, table } = await import("@pdfme/schemas");
+    const { text, table, rectangle, line } = await import("@pdfme/schemas");
 
     type TemplateLike = Parameters<typeof generate>[0]["template"] & { basePdf: string };
     let template: TemplateLike;
@@ -194,7 +247,7 @@ export async function generarPdfBlob(
     const pdf = await generate({
         template,
         inputs,
-        plugins: { text, table },
+        plugins: { text, table, rectangle, line },
     });
     const arrayBuffer = pdf.buffer.slice(pdf.byteOffset, pdf.byteOffset + pdf.byteLength) as ArrayBuffer;
     return new Blob([arrayBuffer], { type: "application/pdf" });

@@ -39,7 +39,7 @@ export function PdfTemplateDesigner({ initialSchemaJson, onTemplateChange, heigh
             try {
                 const { BLANK_PDF } = await import("@pdfme/common");
                 const { Designer } = await import("@pdfme/ui");
-                const { text, table } = await import("@pdfme/schemas");
+                const { text, table, rectangle, line } = await import("@pdfme/schemas");
                 if (cancelled || !containerRef.current) return;
 
                 let parsed: { basePdf: string; schemas: unknown };
@@ -59,7 +59,7 @@ export function PdfTemplateDesigner({ initialSchemaJson, onTemplateChange, heigh
                 const designer = new Designer({
                     domContainer: containerRef.current,
                     template: parsed as Parameters<typeof Designer.prototype.updateTemplate>[0],
-                    plugins: { text, table },
+                    plugins: { text, table, rectangle, line },
                 });
                 designer.onChangeTemplate(() => {
                     const tpl = designer.getTemplate();
