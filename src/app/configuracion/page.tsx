@@ -10,6 +10,7 @@ import { ConfigurationPanel } from "@/components/ConfigurationPanel";
 import { Button } from "@/components/ui/button";
 import { useProcesoStore } from "@/store/useProcesoStore";
 import { getVendedores, simularDistribucion } from "@/lib/api";
+import { shortId } from "@/lib/format-id";
 import {
     PoolRangeForm,
     RangoCortadoDTO,
@@ -164,7 +165,7 @@ export default function ConfiguracionPage() {
                     <WizardStepper currentStep={2} />
                     <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground hidden sm:block">
-                            Proceso: {procesoId?.slice(0, 8)}...
+                            Proceso: {shortId(procesoId)}
                         </span>
                         <Button variant="ghost" size="sm" onClick={handleReset}>
                             <RotateCcw className="h-4 w-4 mr-2" />

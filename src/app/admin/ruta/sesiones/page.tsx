@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/PageHeader";
 import { TableSkeleton } from "@/components/TableSkeleton";
 import { formatFechaHora } from "@/lib/date-format";
+import { shortId } from "@/lib/format-id";
 import {
     Table,
     TableBody,
@@ -150,7 +151,7 @@ export default function AdminSesionesRutaPage() {
                             {sesiones.map((s) => (
                                 <TableRow key={s.sesionId}>
                                     <TableCell className="font-mono text-xs">
-                                        {s.sesionId.slice(0, 8)}…
+                                        {shortId(s.sesionId)}
                                     </TableCell>
                                     <TableCell className="whitespace-nowrap text-sm">
                                         {formatFechaHora(s.createdAt)}

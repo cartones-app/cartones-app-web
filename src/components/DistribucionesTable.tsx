@@ -17,6 +17,7 @@ import type { ProcesoDistribucionResumenDTO } from "@/types";
 import { downloadPdfs, downloadPdfsAdmin } from "@/lib/api";
 import { extractPdfsFromZip } from "@/lib/pdf-from-zip";
 import { formatFechaHora } from "@/lib/date-format";
+import { shortId } from "@/lib/format-id";
 
 type DescargaTipo = "etiquetas" | "resumen" | "zip";
 
@@ -122,7 +123,7 @@ export function DistribucionesTable({ procesos, adminMode = false }: Distribucio
                                     {formatFechaHora(p.createdAt)}
                                 </TableCell>
                                 <TableCell className="font-mono text-xs">
-                                    {p.procesoId.slice(0, 8)}…
+                                    {shortId(p.procesoId)}
                                 </TableCell>
                                 {adminMode && (
                                     <TableCell className="text-sm text-muted-foreground">

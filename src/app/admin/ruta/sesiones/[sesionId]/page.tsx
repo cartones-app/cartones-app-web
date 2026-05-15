@@ -27,6 +27,7 @@ import type {
     SesionRutaResponseDTO,
 } from "@/types";
 import { formatFechaHora } from "@/lib/date-format";
+import { shortId } from "@/lib/format-id";
 
 export default function AdminSesionRutaDetailPage() {
     const params = useParams<{ sesionId: string }>();
@@ -95,7 +96,7 @@ export default function AdminSesionRutaDetailPage() {
                         <h1 className="text-2xl font-semibold">Detalle de sesión</h1>
                         {sesion && (
                             <p className="text-sm text-muted-foreground mt-1">
-                                <span className="font-mono">{sesion.sesionId.slice(0, 8)}…</span> ·
+                                <span className="font-mono">{shortId(sesion.sesionId)}</span> ·
                                 creada {formatFechaHora(sesion.createdAt)} por {sesion.createdBy || "—"} ·
                                 estado <strong>{sesion.estado}</strong> ·
                                 {sesion.registrosCompletados ?? 0}/{sesion.totalRegistros ?? 0} completos

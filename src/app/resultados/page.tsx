@@ -8,6 +8,7 @@ import { WizardStepper } from "@/components/WizardStepper";
 import { ResultsTable } from "@/components/ResultsTable";
 import { PdfDownloader } from "@/components/PdfDownloader";
 import { useProcesoStore } from "@/store/useProcesoStore";
+import { shortId } from "@/lib/format-id";
 
 export default function ResultadosPage() {
     const router = useRouter();
@@ -54,7 +55,7 @@ export default function ResultadosPage() {
                 <div className="container mx-auto px-4 pt-8 flex items-center justify-between gap-2 flex-wrap">
                     <WizardStepper currentStep={3} />
                     <span className="text-xs text-muted-foreground hidden sm:block">
-                        Proceso: {procesoId?.slice(0, 8)}...
+                        Proceso: {shortId(procesoId)}
                     </span>
                 </div>
 
