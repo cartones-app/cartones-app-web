@@ -7,7 +7,9 @@ import { toast } from "sonner";
 import { Loader2, Download, FileText, Tag, CheckCircle2, AlertTriangle, ArrowLeft, Info, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { downloadPdfs } from "@/lib/api";
+import { downloadPdfs, obtenerDatosDistribucion, obtenerPdfTemplateActivo } from "@/lib/api";
+import { generarPdfsDeProceso } from "@/lib/pdf-generator";
+import { useFeatureFlags } from "@/components/FeatureFlagsProvider";
 
 interface PdfDownloaderProps {
     procesoId: string;
@@ -20,83 +22,53 @@ interface ExtractedFiles {
     resumen: Blob | null;
 }
 
+/**
+ * Flujo de descarga de PDFs.
+ *
+ * <p><b>Flujo principal (client-side, pdf.client.enabled=true)</b>:
+ *   1. GET /api/distribuciones/{id}/datos — datos crudos.
+ *   2. GET /api/pdf-templates/active?tipo=ETIQUETAS/RESUMEN — schemas.
+ *   3. {@code generarPdfsDeProceso} con pdfme en el browser.
+ *
+ * <p><b>Fallback (pdf.client.enabled=false)</b>: GET /api/distribuciones/{id}/pdfs
+ * que devuelve el ZIP server-side viejo y se extrae con JSZip. Permite rollback
+ * sin redeploy si el flujo cliente falla en prod.
+ *
+ * <p>A diferencia del flujo viejo (one-shot), la generación cliente puede
+ * repetirse — los datos viven en el SimulacionCache server-side y los
+ * templates son inmutables a corto plazo. No bloqueamos al usuario.
+ */
 export function PdfDownloader({ procesoId, onBack, onReset }: PdfDownloaderProps) {
+    const { isEnabled } = useFeatureFlags();
     const [isLoading, setIsLoading] = useState(false);
     const [extractedFiles, setExtractedFiles] = useState<ExtractedFiles>({
         etiquetas: null,
         resumen: null,
     });
     const [isExtracted, setIsExtracted] = useState(false);
-    const [hasBeenGenerated, setHasBeenGenerated] = useState(false);
     const [downloadError, setDownloadError] = useState(false);
-    // Apuntamos al banner de éxito para hacer scroll cuando se generan
-    // los archivos — si no, la sección de descarga queda fuera del viewport
-    // y el usuario no se entera de que ya puede bajar los PDFs.
     const successRef = useRef<HTMLDivElement | null>(null);
 
     const handleGenerateFiles = async () => {
-        // Prevent multiple calls - one-shot endpoint
-        if (hasBeenGenerated) {
-            toast.warning("Los archivos ya fueron generados", {
-                description: "Solo se permite la descarga una vez.",
-            });
-            return;
-        }
-
         setIsLoading(true);
         setDownloadError(false);
 
         try {
-            // Download the ZIP file - ONE-SHOT, can only be called once
-            const zipBlob = await downloadPdfs(procesoId);
+            const clientEnabled = isEnabled("pdf.client.enabled", true);
+            const { etiquetas, resumen } = clientEnabled
+                ? await generarClientSide(procesoId)
+                : await generarServerSide(procesoId);
 
-            // Use JSZip to extract the contents
-            const zip = await JSZip.loadAsync(zipBlob);
-
-            let etiquetasFile: Blob | null = null;
-            let resumenFile: Blob | null = null;
-
-            // Iterate through files in the ZIP
-            for (const [filename, file] of Object.entries(zip.files)) {
-                if (file.dir) continue;
-
-                const content = await file.async("blob");
-                const pdfBlob = new Blob([content], { type: "application/pdf" });
-
-                // Match files by name pattern
-                const lowerName = filename.toLowerCase();
-                if (lowerName.includes("etiqueta") || lowerName.includes("label")) {
-                    etiquetasFile = pdfBlob;
-                } else if (lowerName.includes("resumen") || lowerName.includes("summary")) {
-                    resumenFile = pdfBlob;
-                } else if (!etiquetasFile) {
-                    // If no pattern match, assign first PDF as etiquetas
-                    etiquetasFile = pdfBlob;
-                } else if (!resumenFile) {
-                    // Assign second PDF as resumen
-                    resumenFile = pdfBlob;
-                }
-            }
-
-            setExtractedFiles({
-                etiquetas: etiquetasFile,
-                resumen: resumenFile,
-            });
+            setExtractedFiles({ etiquetas, resumen });
             setIsExtracted(true);
-            setHasBeenGenerated(true);
-
             toast.success("Archivos generados", {
                 description: "Los PDFs están listos para descargar.",
             });
-
-            // Scroll suave al banner de éxito en el siguiente tick para que
-            // el usuario vea inmediatamente que la generación terminó y dónde
-            // están los botones de descarga.
             requestAnimationFrame(() => {
                 successRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
             });
         } catch {
-            // Error handled by axios interceptor
+            // El interceptor global ya mostró el error de HTTP. Mostramos el banner.
             setDownloadError(true);
         } finally {
             setIsLoading(false);
@@ -124,10 +96,10 @@ export function PdfDownloader({ procesoId, onBack, onReset }: PdfDownloaderProps
                     <CardTitle className="text-xl flex items-center gap-2">
                         <FileText className="h-5 w-5" />
                         Archivos PDF
-                        {hasBeenGenerated && (
+                        {isExtracted && (
                             <span className="ml-auto flex items-center gap-1 text-sm font-normal text-emerald-600 dark:text-emerald-400">
                                 <CheckCircle2 className="h-4 w-4" />
-                                Archivos en memoria
+                                Archivos listos
                             </span>
                         )}
                     </CardTitle>
@@ -142,7 +114,7 @@ export function PdfDownloader({ procesoId, onBack, onReset }: PdfDownloaderProps
                                         <p>Error al generar los archivos</p>
                                     </div>
                                     <p className="text-sm text-muted-foreground">
-                                        Si ya generaste los archivos anteriormente, deberás iniciar un nuevo proceso.
+                                        Intentá de nuevo. Si persiste, contactá al administrador.
                                     </p>
                                 </div>
                             ) : (
@@ -184,7 +156,6 @@ export function PdfDownloader({ procesoId, onBack, onReset }: PdfDownloaderProps
                         </div>
                     ) : (
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            {/* Success indicator */}
                             <div
                                 ref={successRef}
                                 className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-sm text-emerald-600 dark:text-emerald-400 scroll-mt-24"
@@ -196,7 +167,6 @@ export function PdfDownloader({ procesoId, onBack, onReset }: PdfDownloaderProps
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* Etiquetas Download */}
                                 <div className="p-4 rounded-lg bg-muted/50 border transition-colors hover:bg-muted/80">
                                     <div className="flex items-center gap-3 mb-3">
                                         <div className="p-2 rounded-full bg-primary/10">
@@ -220,7 +190,6 @@ export function PdfDownloader({ procesoId, onBack, onReset }: PdfDownloaderProps
                                     </Button>
                                 </div>
 
-                                {/* Resumen Download */}
                                 <div className="p-4 rounded-lg bg-muted/50 border transition-colors hover:bg-muted/80">
                                     <div className="flex items-center gap-3 mb-3">
                                         <div className="p-2 rounded-full bg-primary/10">
@@ -249,7 +218,6 @@ export function PdfDownloader({ procesoId, onBack, onReset }: PdfDownloaderProps
                 </CardContent>
             </Card>
 
-            {/* Iniciar Nuevo Proceso - Only shown when files are ready (replaces Back button flow) */}
             {isExtracted && (
                 <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm border-l-4 border-l-primary animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
                     <CardContent className="py-4">
@@ -272,11 +240,6 @@ export function PdfDownloader({ procesoId, onBack, onReset }: PdfDownloaderProps
                 </Card>
             )}
 
-            {/*
-              Floating Action Dock — replica el patrón de /configuracion. Las
-              acciones críticas quedan siempre visibles sin tener que scrollear
-              hasta el final de la tabla de resultados.
-            */}
             <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-2xl bg-background/75 backdrop-blur-lg border border-border/40 shadow-xl rounded-full p-2 flex items-center justify-end gap-2">
                 {!isExtracted ? (
                     <>
@@ -311,11 +274,6 @@ export function PdfDownloader({ procesoId, onBack, onReset }: PdfDownloaderProps
                     </>
                 ) : (
                     <>
-                        {/*
-                          Post-generación: los botones de descarga viven acá para que el usuario
-                          no tenga que scrollear hasta el card. "Iniciar Nuevo Proceso" queda
-                          solo en la card destacada — es una acción terminal, no urgente.
-                        */}
                         <Button
                             onClick={handleDownloadEtiquetas}
                             disabled={!extractedFiles.etiquetas}
@@ -340,4 +298,43 @@ export function PdfDownloader({ procesoId, onBack, onReset }: PdfDownloaderProps
             </div>
         </div>
     );
+}
+
+/** Flujo principal: pide datos + templates al backend y arma los PDFs con pdfme. */
+async function generarClientSide(procesoId: string): Promise<ExtractedFiles> {
+    const [datos, tEtiquetas, tResumen] = await Promise.all([
+        obtenerDatosDistribucion(procesoId),
+        obtenerPdfTemplateActivo("ETIQUETAS"),
+        obtenerPdfTemplateActivo("RESUMEN"),
+    ]);
+    const { etiquetas, resumen } = await generarPdfsDeProceso(datos, tEtiquetas, tResumen);
+    return { etiquetas, resumen };
+}
+
+/**
+ * Fallback al endpoint server-side viejo (ZIP con los 2 PDFs). Se usa cuando
+ * el flag pdf.client.enabled está en false — kill-switch sin redeploy.
+ */
+async function generarServerSide(procesoId: string): Promise<ExtractedFiles> {
+    const zipBlob = await downloadPdfs(procesoId);
+    const zip = await JSZip.loadAsync(zipBlob);
+
+    let etiquetas: Blob | null = null;
+    let resumen: Blob | null = null;
+    for (const [filename, file] of Object.entries(zip.files)) {
+        if (file.dir) continue;
+        const content = await file.async("blob");
+        const pdfBlob = new Blob([content], { type: "application/pdf" });
+        const lowerName = filename.toLowerCase();
+        if (lowerName.includes("etiqueta") || lowerName.includes("label")) {
+            etiquetas = pdfBlob;
+        } else if (lowerName.includes("resumen") || lowerName.includes("summary")) {
+            resumen = pdfBlob;
+        } else if (!etiquetas) {
+            etiquetas = pdfBlob;
+        } else if (!resumen) {
+            resumen = pdfBlob;
+        }
+    }
+    return { etiquetas, resumen };
 }
