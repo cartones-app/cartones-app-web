@@ -63,28 +63,47 @@ const FeatureFlagsContext = createContext<FeatureFlagsState | null>(null);
  * queda en {} — los gating callers ven default {@code true} y la app no se
  * rompe (fail-open).
  *
- * <p><b>Cache en localStorage</b>: para que el sidebar no muestre items
- * deshabilitados durante el primer fetch tras un reload, el state se hidrata
- * con el último snapshot conocido del usuario. Se invalida en logout.
+ * <p><b>Hidratación inicial (en orden de prioridad)</b>:
+ * <ol>
+ *   <li>{@code initialFlags} pasado desde el root layout (SSR) — elimina el
+ *       flash porque el HTML llega con los flags ya resueltos.</li>
+ *   <li>Cache de localStorage del último login — fallback cuando SSR no pudo
+ *       (sesión expirada, backend down, etc.).</li>
+ *   <li>{@code null} — render con todos los flags en default true hasta que
+ *       el fetch client-side resuelva (flash inevitable la primera vez).</li>
+ * </ol>
  *
  * <p><b>Por qué los setState están en callbacks .then/.catch del effect</b>:
  * la regla {@code react-hooks/set-state-in-effect} prohibe disparar setState
  * sincrónicamente en el body del effect. Derivamos {@code flags} de
  * {@code fetched + status} para no necesitar un setState al desautenticar.
  */
-export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
+export function FeatureFlagsProvider({
+    children,
+    initialFlags,
+}: {
+    readonly children: ReactNode;
+    readonly initialFlags?: PublicFeatureFlags | null;
+}) {
     const { status } = useSession();
-    // null = nunca se intentó (primera carga sin cache); {} = intentado y vacío/fallido;
-    // populado = OK. Permite derivar `loading` sin un setState extra y reduce
-    // el flash al hidratar con el cache de localStorage.
-    const [fetched, setFetched] = useState<PublicFeatureFlags | null>(readCachedFlags);
+    // Prioridad: SSR initial > localStorage cache > null.
+    // El lazy init corre una sola vez (en SSR y en hydration con el mismo
+    // valor vía la prop) — no hay hydration mismatch.
+    const [fetched, setFetched] = useState<PublicFeatureFlags | null>(
+        () => initialFlags ?? readCachedFlags()
+    );
 
-    // Derivado: cuando no estamos autenticados no exponemos ningún flag.
+    // Derivado: mientras NextAuth no diga explícitamente "unauthenticated"
+    // confiamos en `fetched` (vino de SSR o cache). Si no hay nada, {} —
+    // los gating callers caen al default true.
+    // Solo limpiamos a {} cuando el status es unauthenticated, para no
+    // reintroducir el flash durante la hidratación inicial de NextAuth (que
+    // arranca con status="loading" en el cliente).
     const flags: PublicFeatureFlags = useMemo(
-        () => (status === "authenticated" && fetched ? fetched : {}),
+        () => (status === "unauthenticated" ? {} : (fetched ?? {})),
         [status, fetched]
     );
-    const loading = status === "authenticated" && fetched === null;
+    const loading = fetched === null && status !== "unauthenticated";
 
     const refresh = useCallback((): Promise<void> => {
         if (status !== "authenticated") return Promise.resolve();
