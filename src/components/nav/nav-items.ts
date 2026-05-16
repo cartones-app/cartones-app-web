@@ -4,6 +4,7 @@ import {
     LayoutDashboard,
     LayoutGrid,
     ListChecks,
+    Printer,
     Route,
     Settings,
     ShieldCheck,
@@ -75,6 +76,12 @@ export const NAV_GROUPS: NavGroup[] = [
                 requiresProceso: true,
                 flag: FLAG_PAGE_CONFIGURACION,
             },
+            {
+                href: "/preferencias-etiquetas",
+                title: "Preferencias de etiquetas",
+                description: "Diseño y orden de impresión del PDF de etiquetas.",
+                icon: Printer,
+            },
         ],
     },
     {
@@ -110,6 +117,12 @@ export const NAV_GROUPS: NavGroup[] = [
                 title: "Exclusiones de ruta",
                 description: "Vendedores y entradas excluidas del filtrado.",
                 icon: ShieldCheck,
+            },
+            {
+                href: "/admin/preferencias-etiquetas",
+                title: "Preferencias de etiquetas",
+                description: "Ajustar diseño y orden de etiquetas por distribuidor.",
+                icon: Printer,
             },
             {
                 href: "/admin/feature-flags",

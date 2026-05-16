@@ -202,3 +202,34 @@ export interface SetFlagRequest {
  * Solo incluye los flags marcados publicRead=true en el registry.
  */
 export type PublicFeatureFlags = Record<string, string>;
+
+// --- Preferencias de impresión de etiquetas -------------------------------
+
+export type LayoutEtiqueta = "TRES_POR_HOJA" | "CUATRO_POR_HOJA";
+export type OrdenEtiqueta = "SECUENCIAL" | "INTERCALADO";
+
+/** Backend: GET /api/me/preferencias-etiquetas | GET /api/admin/.../{username} */
+export interface PreferenciasEtiquetasDTO {
+    username: string;
+    layoutEtiqueta: LayoutEtiqueta;
+    ordenEtiqueta: OrdenEtiqueta;
+    updatedAt: string;
+    modifiedBy: string | null;
+}
+
+/** Backend: PUT /api/me/preferencias-etiquetas | PUT /api/admin/.../{username} */
+export interface ActualizarPreferenciasRequest {
+    layoutEtiqueta: LayoutEtiqueta;
+    ordenEtiqueta: OrdenEtiqueta;
+}
+
+/** Backend: GET /api/admin/preferencias-etiquetas (Spring Page<T>) */
+export interface PageResponse<T> {
+    content: T[];
+    number: number;
+    size: number;
+    totalElements: number;
+    totalPages: number;
+    first: boolean;
+    last: boolean;
+}

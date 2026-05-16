@@ -1,5 +1,6 @@
 import api from './axios';
 import {
+    ActualizarPreferenciasRequest,
     CargaRutaResponseDTO,
     EliminarSesionesRequestDTO,
     ExclusionRutaRequestDTO,
@@ -7,6 +8,8 @@ import {
     ExportarRutaRequestDTO,
     FiltroFechaRequestDTO,
     FlagViewDTO,
+    PageResponse,
+    PreferenciasEtiquetasDTO,
     ProcesoDistribucionResumenDTO,
     PublicFeatureFlags,
     RegistroRutaDTO,
@@ -271,5 +274,56 @@ export const clearFeatureFlagOverride = async (flagKey: string): Promise<void> =
  */
 export const obtenerFlagsPublicos = async (): Promise<PublicFeatureFlags> => {
     const response = await api.get<PublicFeatureFlags>('/api/feature-flags');
+    return response.data;
+};
+
+// --- Preferencias de impresión de etiquetas -------------------------------
+
+/** GET /api/me/preferencias-etiquetas — devuelve la preferencia del user logueado
+ *  (o defaults si nunca configuró). */
+export const obtenerMisPreferenciasEtiquetas = async (): Promise<PreferenciasEtiquetasDTO> => {
+    const response = await api.get<PreferenciasEtiquetasDTO>('/api/me/preferencias-etiquetas');
+    return response.data;
+};
+
+/** PUT /api/me/preferencias-etiquetas — upsert de la preferencia del user logueado. */
+export const guardarMisPreferenciasEtiquetas = async (
+    body: ActualizarPreferenciasRequest
+): Promise<PreferenciasEtiquetasDTO> => {
+    const response = await api.put<PreferenciasEtiquetasDTO>('/api/me/preferencias-etiquetas', body);
+    return response.data;
+};
+
+/** GET /api/admin/preferencias-etiquetas — listado paginado para el panel admin. */
+export const listarPreferenciasAdmin = async (
+    page = 0,
+    size = 50
+): Promise<PageResponse<PreferenciasEtiquetasDTO>> => {
+    const response = await api.get<PageResponse<PreferenciasEtiquetasDTO>>(
+        '/api/admin/preferencias-etiquetas',
+        { params: { page, size } },
+    );
+    return response.data;
+};
+
+/** GET /api/admin/preferencias-etiquetas/{username} — lee la prefer de cualquier user. */
+export const obtenerPreferenciasAdmin = async (
+    username: string
+): Promise<PreferenciasEtiquetasDTO> => {
+    const response = await api.get<PreferenciasEtiquetasDTO>(
+        `/api/admin/preferencias-etiquetas/${encodeURIComponent(username)}`,
+    );
+    return response.data;
+};
+
+/** PUT /api/admin/preferencias-etiquetas/{username} — upsert por cuenta del user. */
+export const guardarPreferenciasAdmin = async (
+    username: string,
+    body: ActualizarPreferenciasRequest,
+): Promise<PreferenciasEtiquetasDTO> => {
+    const response = await api.put<PreferenciasEtiquetasDTO>(
+        `/api/admin/preferencias-etiquetas/${encodeURIComponent(username)}`,
+        body,
+    );
     return response.data;
 };
