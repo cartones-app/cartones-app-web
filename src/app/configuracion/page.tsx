@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { format } from "date-fns";
 import { Loader2, ArrowLeft, RotateCcw } from "lucide-react";
 import { WizardStepper } from "@/components/WizardStepper";
 import { ConfigurationPanel } from "@/components/ConfigurationPanel";
 import { Button } from "@/components/ui/button";
 import { useProcesoStore } from "@/store/useProcesoStore";
 import { getVendedores, simularDistribucion } from "@/lib/api";
+import { dateToIsoLocal } from "@/lib/date-format";
 import { shortId } from "@/lib/format-id";
 import {
     PoolRangeForm,
@@ -19,8 +19,8 @@ import {
 } from "@/types";
 
 /**
- * ISO 'yyyy-MM-dd' → Date en hora local. Round-trip con {@link dateToIso}
- * es estable porque ambos lados usan el TZ del browser (date-fns format).
+ * ISO 'yyyy-MM-dd' → Date en hora local. Round-trip con
+ * {@link dateToIsoLocal} es estable porque ambos lados usan el TZ del browser.
  */
 function isoToDate(iso: string | null): Date | undefined {
     if (!iso) return undefined;
@@ -31,7 +31,7 @@ function isoToDate(iso: string | null): Date | undefined {
 
 /** Date → ISO 'yyyy-MM-dd' local-aware. */
 function dateToIso(d: Date | undefined): string | null {
-    return d ? format(d, "yyyy-MM-dd") : null;
+    return d ? dateToIsoLocal(d) : null;
 }
 
 export default function ConfiguracionPage() {

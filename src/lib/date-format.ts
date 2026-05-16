@@ -60,3 +60,39 @@ export function formatFechaHoraCorta(iso: string | null | undefined): string {
         return iso;
     }
 }
+
+// --- Helpers para Date (no ISO del backend) ------------------------------
+
+const FECHA_LARGA_OPTS: Intl.DateTimeFormatOptions = {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+};
+
+/**
+ * Formato largo "27 de mayo de 2026" en español. Equivalente al
+ * `format(d, "PPP", { locale: es })` de date-fns, pero con Intl nativo
+ * (cero KB de bundle).
+ */
+export function formatFechaLarga(d: Date): string {
+    return new Intl.DateTimeFormat("es-AR", FECHA_LARGA_OPTS).format(d);
+}
+
+/**
+ * ISO `yyyy-MM-dd` en el huso horario del BROWSER que ejecuta esta función
+ * (no UTC). "Local" = la TZ del visitante de la app, no la del servidor ni
+ * la del desarrollador. Útil para fechas sin componente horario, donde
+ * cada usuario debería ver "su día calendario".
+ *
+ * Si usáramos `toISOString().slice(0,10)` un usuario en hora UTC-3 a las
+ * 22:00 vería el día siguiente — y eso casi nunca es lo deseado.
+ *
+ * Round-trip estable con el constructor `new Date(y, m-1, d)` dentro del
+ * mismo browser (ambos lados usan getFullYear/getMonth/getDate locales).
+ */
+export function dateToIsoLocal(d: Date): string {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+}

@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Calendar as CalendarIcon, Plus, Trash2, Play, ArrowRight, ArrowLeft } from "lucide-react";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { Calendar as CalendarIcon, Plus, Trash2, Play, ArrowRight, ArrowLeft, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatFechaLarga } from "@/lib/date-format";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
@@ -12,7 +11,6 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Search } from "lucide-react";
 import { PoolRangeForm, VendedorInputDTO, VendedorResponseDTO, VendedorSimuladoDTO } from "@/types";
 import { VendedorAccordion } from "./VendedorAccordion";
 import { ResultsTable } from "./ResultsTable";
@@ -143,7 +141,7 @@ export function ConfigurationPanel({
                                     >
                                         <CalendarIcon className="mr-2 h-4 w-4" />
                                         {fechaSorteoSenete ? (
-                                            format(fechaSorteoSenete, "PPP", { locale: es })
+                                            formatFechaLarga(fechaSorteoSenete)
                                         ) : (
                                             <span>Seleccionar fecha</span>
                                         )}
@@ -174,7 +172,7 @@ export function ConfigurationPanel({
                                     >
                                         <CalendarIcon className="mr-2 h-4 w-4" />
                                         {fechaSorteoTelebingo ? (
-                                            format(fechaSorteoTelebingo, "PPP", { locale: es })
+                                            formatFechaLarga(fechaSorteoTelebingo)
                                         ) : (
                                             <span>Seleccionar fecha</span>
                                         )}
