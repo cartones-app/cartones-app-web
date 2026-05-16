@@ -2,21 +2,11 @@
 
 import { useSession } from "next-auth/react";
 
-/**
- * Convención: Keycloak realm-role `admin` (case-insensitive). El backend usa
- * `KeycloakRolesConverter` que mapea `realm_access.roles` a Spring
- * `ROLE_admin`/`ROLE_ADMIN` y el `@PreAuthorize("hasRole('ADMIN')")` matchea
- * sin importar la capitalización.
- *
- * Mantengo el matching client-side también case-insensitive para evitar
- * inconsistencias UX si Keycloak emite el role con otra capitalización.
- */
-const ADMIN_ROLE_NAMES = new Set(["admin"]);
+import { rolesIncluyeAdmin } from "./auth-roles";
 
-export function rolesIncluyeAdmin(roles: string[] | undefined): boolean {
-    if (!roles) return false;
-    return roles.some((r) => ADMIN_ROLE_NAMES.has(r.toLowerCase()));
-}
+// Re-export para no romper imports existentes
+// (`import { rolesIncluyeAdmin } from "@/lib/auth-utils"`).
+export { rolesIncluyeAdmin };
 
 export interface UserPermissions {
     /** true mientras NextAuth resuelve la sesión inicial. */
