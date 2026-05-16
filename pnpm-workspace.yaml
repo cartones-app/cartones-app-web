@@ -1,0 +1,16 @@
+# pnpm 11+ trusted-builds approval.
+#
+# pnpm bloquea por seguridad los install scripts de paquetes recién agregados
+# para mitigar supply-chain attacks. Acá explícitamente aprobamos los que
+# necesitamos compilar/setupear en cada instalación.
+#
+# Cualquier paquete nuevo con install scripts va a aparecer en este archivo
+# como "set this to true or false" durante el próximo `pnpm install` y va a
+# requerir decisión consciente del dev.
+#
+# - sharp: image processing nativo (libvips). Next.js lo usa para Image
+#   optimization en build/runtime. Descarga prebuilts vía install script.
+# - unrs-resolver: resolver Rust de rspack/eslint-config-next. Native binary.
+allowBuilds:
+  sharp: true
+  unrs-resolver: true

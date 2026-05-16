@@ -1,0 +1,43 @@
+services:
+  frontend:
+    build:
+      context: .
+    container_name: cartones_frontend
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      # URL interna del backend (NO NEXT_PUBLIC_): el Next server la usa para
+      # los rewrites de /api-proxy/*. En esta network "proxy" el backend
+      # resuelve por DNS interno docker como `backend:9001`. El browser NUNCA
+      # ve esta URL — solo habla con Next en same-origin.
+      BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://backend:9001}
+      # NextAuth runtime — sin estos, el login OIDC no inicializa.
+      # Vienen del .env que el workflow genera leyendo GitHub Variables/Secrets.
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      AUTH_SECRET: ${AUTH_SECRET}
+      AUTH_KEYCLOAK_ID: ${AUTH_KEYCLOAK_ID}
+      AUTH_KEYCLOAK_SECRET: ${AUTH_KEYCLOAK_SECRET}
+      AUTH_KEYCLOAK_ISSUER: ${AUTH_KEYCLOAK_ISSUER}
+    networks:
+      - proxy
+    # Healthcheck con Node.js puro (la imagen es node:22-alpine).
+    # wget --spider falla con 302 del root; nc en busybox dio resultados
+    # raros. createConnection es la opción más portable.
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('net').createConnection(3000,'localhost').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+networks:
+  proxy:
+    # Network externa creada por ~/infra-claude/vps (nginx-proxy + cloudflared).
+    external: true

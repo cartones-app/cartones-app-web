@@ -1,25 +1,45 @@
 import api from './axios';
 import {
+    ActualizarPreferenciasRequest,
+    CargaRutaResponseDTO,
+    EliminarSesionesRequestDTO,
+    ExclusionRutaRequestDTO,
+    ExclusionRutaResponseDTO,
+    ExportarRutaRequestDTO,
+    FiltroFechaRequestDTO,
+    FlagViewDTO,
+    PageResponse,
+    PreferenciasEtiquetasDTO,
+    ProcesoDistribucionResumenDTO,
+    PublicFeatureFlags,
+    RegistroRutaDTO,
+    SesionRutaRegistroResponseDTO,
+    SesionRutaResponseDTO,
+    SetFlagRequest,
     SimulacionRequestDTO,
     VendedorResponseDTO,
     VendedorSimuladoDTO
 } from '@/types';
 
 /**
- * Upload Excel file and get procesoId
+ * Upload Excel file and get procesoId.
  * POST /api/vendedores/carga
+ *
+ * El backend responde con CargaVendedoresResponseDTO { filasIgnoradas, procesoId }.
+ * Devolvemos solo el procesoId acá; si el caller necesita filasIgnoradas vamos
+ * a tener que cambiar la firma.
  */
 export const uploadExcel = async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await api.post<string>('/api/vendedores/carga', formData, {
-        headers: {
-            'Content-Type': 'multipart/form-data',
-        },
-    });
+    const response = await api.post<{ procesoId: string; filasIgnoradas?: string[] }>(
+        '/api/vendedores/carga',
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
 
-    return response.data;
+    return response.data.procesoId;
 };
 
 /**
@@ -58,9 +78,252 @@ export const downloadPdfs = async (procesoId: string): Promise<Blob> => {
 };
 
 /**
- * Delete all vendors (cleanup)
- * DELETE /api/vendedores
+ * Lista los procesos de distribución del usuario autenticado.
+ * GET /api/distribuciones
  */
-export const deleteVendedores = async (): Promise<void> => {
-    await api.delete('/api/vendedores');
+export const listarMisDistribuciones = async (): Promise<ProcesoDistribucionResumenDTO[]> => {
+    const response = await api.get<ProcesoDistribucionResumenDTO[]>('/api/distribuciones');
+    return response.data;
+};
+
+/**
+ * Lista todos los procesos del sistema (vista admin).
+ * GET /api/admin/distribuciones
+ * Requiere rol ADMIN — el backend devuelve 403 si el usuario no lo tiene.
+ */
+export const listarTodasLasDistribuciones = async (): Promise<ProcesoDistribucionResumenDTO[]> => {
+    const response = await api.get<ProcesoDistribucionResumenDTO[]>('/api/admin/distribuciones');
+    return response.data;
+};
+
+/**
+ * Descarga el ZIP del proceso (vista admin, sin restricción de ownership).
+ * GET /api/admin/distribuciones/{procesoId}/pdfs
+ */
+export const downloadPdfsAdmin = async (procesoId: string): Promise<Blob> => {
+    const response = await api.get(`/api/admin/distribuciones/${procesoId}/pdfs`, {
+        responseType: 'blob',
+    });
+    return response.data;
+};
+
+// ============================================================================
+// Módulo Ruta (distribuidor)
+// ============================================================================
+
+/**
+ * Sube el Excel de ruta y crea una sesión. Devuelve sesionId + fechas disponibles.
+ * POST /api/ruta/carga
+ */
+export const cargarRutaExcel = async (file: File): Promise<CargaRutaResponseDTO> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post<CargaRutaResponseDTO>('/api/ruta/carga', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+};
+
+/**
+ * Filtra los registros del Excel por fechas seleccionadas. Devuelve los registros
+ * a completar.
+ * POST /api/ruta/{sesionId}/registros
+ */
+export const filtrarRutaPorFechas = async (
+    sesionId: string,
+    body: FiltroFechaRequestDTO
+): Promise<RegistroRutaDTO[]> => {
+    const response = await api.post<RegistroRutaDTO[]>(
+        `/api/ruta/${encodeURIComponent(sesionId)}/registros`,
+        body
+    );
+    return response.data;
+};
+
+/**
+ * Exporta el Excel modificado con los registros completados.
+ * POST /api/ruta/{sesionId}/exportar
+ */
+export const exportarRutaExcel = async (
+    sesionId: string,
+    body: ExportarRutaRequestDTO
+): Promise<Blob> => {
+    const response = await api.post(
+        `/api/ruta/${encodeURIComponent(sesionId)}/exportar`,
+        body,
+        { responseType: 'blob' }
+    );
+    return response.data;
+};
+
+// ============================================================================
+// Módulo Ruta — Admin: Sesiones
+// ============================================================================
+
+/** GET /api/admin/ruta/sesiones?estado=&createdBy= */
+export const listarSesionesRuta = async (params?: {
+    estado?: string;
+    createdBy?: string;
+}): Promise<SesionRutaResponseDTO[]> => {
+    const response = await api.get<SesionRutaResponseDTO[]>('/api/admin/ruta/sesiones', { params });
+    return response.data;
+};
+
+/** GET /api/admin/ruta/sesiones/{sesionId} */
+export const obtenerSesionRuta = async (sesionId: string): Promise<SesionRutaResponseDTO> => {
+    const response = await api.get<SesionRutaResponseDTO>(
+        `/api/admin/ruta/sesiones/${encodeURIComponent(sesionId)}`
+    );
+    return response.data;
+};
+
+/**
+ * GET /api/admin/ruta/sesiones/{sesionId}/registros con filtros opcionales.
+ */
+export const listarRegistrosDeSesion = async (
+    sesionId: string,
+    params?: { completado?: boolean; vendedorNombre?: string; camposIncompletos?: boolean }
+): Promise<SesionRutaRegistroResponseDTO[]> => {
+    const response = await api.get<SesionRutaRegistroResponseDTO[]>(
+        `/api/admin/ruta/sesiones/${encodeURIComponent(sesionId)}/registros`,
+        { params }
+    );
+    return response.data;
+};
+
+/** DELETE /api/admin/ruta/sesiones/{sesionId} (bloquea si está ACTIVA). */
+export const eliminarSesionRuta = async (sesionId: string): Promise<void> => {
+    await api.delete(`/api/admin/ruta/sesiones/${encodeURIComponent(sesionId)}`);
+};
+
+/** DELETE /api/admin/ruta/sesiones (bulk). */
+export const eliminarSesionesRutaBulk = async (body: EliminarSesionesRequestDTO): Promise<void> => {
+    await api.delete('/api/admin/ruta/sesiones', { data: body });
+};
+
+/** DELETE /api/admin/ruta/registros/{id} */
+export const eliminarRegistroRuta = async (id: number): Promise<void> => {
+    await api.delete(`/api/admin/ruta/registros/${id}`);
+};
+
+// ============================================================================
+// Módulo Ruta — Admin: Exclusiones
+// ============================================================================
+
+/** GET /api/admin/ruta/exclusiones */
+export const listarExclusiones = async (): Promise<ExclusionRutaResponseDTO[]> => {
+    const response = await api.get<ExclusionRutaResponseDTO[]>('/api/admin/ruta/exclusiones');
+    return response.data;
+};
+
+/** POST /api/admin/ruta/exclusiones */
+export const crearExclusion = async (
+    body: ExclusionRutaRequestDTO
+): Promise<ExclusionRutaResponseDTO> => {
+    const response = await api.post<ExclusionRutaResponseDTO>('/api/admin/ruta/exclusiones', body);
+    return response.data;
+};
+
+/** PUT /api/admin/ruta/exclusiones/{id} */
+export const actualizarExclusion = async (
+    id: number,
+    body: ExclusionRutaRequestDTO
+): Promise<ExclusionRutaResponseDTO> => {
+    const response = await api.put<ExclusionRutaResponseDTO>(
+        `/api/admin/ruta/exclusiones/${id}`,
+        body
+    );
+    return response.data;
+};
+
+/** DELETE /api/admin/ruta/exclusiones/{id} */
+export const eliminarExclusion = async (id: number): Promise<void> => {
+    await api.delete(`/api/admin/ruta/exclusiones/${id}`);
+};
+
+// ============================================================================
+// Feature flags — Admin
+// ============================================================================
+
+/** GET /api/admin/feature-flags */
+export const listarFeatureFlags = async (): Promise<FlagViewDTO[]> => {
+    const response = await api.get<FlagViewDTO[]>('/api/admin/feature-flags');
+    return response.data;
+};
+
+/** PUT /api/admin/feature-flags/{flagKey} — crea o actualiza el override. */
+export const setFeatureFlagOverride = async (
+    flagKey: string,
+    body: SetFlagRequest
+): Promise<FlagViewDTO> => {
+    const response = await api.put<FlagViewDTO>(
+        `/api/admin/feature-flags/${encodeURIComponent(flagKey)}`,
+        body
+    );
+    return response.data;
+};
+
+/** DELETE /api/admin/feature-flags/{flagKey} — vuelve al default del YAML. */
+export const clearFeatureFlagOverride = async (flagKey: string): Promise<void> => {
+    await api.delete(`/api/admin/feature-flags/${encodeURIComponent(flagKey)}`);
+};
+
+/**
+ * GET /api/feature-flags — flags públicos (sin rol admin), usados para gating
+ * de páginas del front. Devuelve { "page.upload.enabled": "true", ... }.
+ */
+export const obtenerFlagsPublicos = async (): Promise<PublicFeatureFlags> => {
+    const response = await api.get<PublicFeatureFlags>('/api/feature-flags');
+    return response.data;
+};
+
+// --- Preferencias de impresión de etiquetas -------------------------------
+
+/** GET /api/me/preferencias-etiquetas — devuelve la preferencia del user logueado
+ *  (o defaults si nunca configuró). */
+export const obtenerMisPreferenciasEtiquetas = async (): Promise<PreferenciasEtiquetasDTO> => {
+    const response = await api.get<PreferenciasEtiquetasDTO>('/api/me/preferencias-etiquetas');
+    return response.data;
+};
+
+/** PUT /api/me/preferencias-etiquetas — upsert de la preferencia del user logueado. */
+export const guardarMisPreferenciasEtiquetas = async (
+    body: ActualizarPreferenciasRequest
+): Promise<PreferenciasEtiquetasDTO> => {
+    const response = await api.put<PreferenciasEtiquetasDTO>('/api/me/preferencias-etiquetas', body);
+    return response.data;
+};
+
+/** GET /api/admin/preferencias-etiquetas — listado paginado para el panel admin. */
+export const listarPreferenciasAdmin = async (
+    page = 0,
+    size = 50
+): Promise<PageResponse<PreferenciasEtiquetasDTO>> => {
+    const response = await api.get<PageResponse<PreferenciasEtiquetasDTO>>(
+        '/api/admin/preferencias-etiquetas',
+        { params: { page, size } },
+    );
+    return response.data;
+};
+
+/** GET /api/admin/preferencias-etiquetas/{username} — lee la prefer de cualquier user. */
+export const obtenerPreferenciasAdmin = async (
+    username: string
+): Promise<PreferenciasEtiquetasDTO> => {
+    const response = await api.get<PreferenciasEtiquetasDTO>(
+        `/api/admin/preferencias-etiquetas/${encodeURIComponent(username)}`,
+    );
+    return response.data;
+};
+
+/** PUT /api/admin/preferencias-etiquetas/{username} — upsert por cuenta del user. */
+export const guardarPreferenciasAdmin = async (
+    username: string,
+    body: ActualizarPreferenciasRequest,
+): Promise<PreferenciasEtiquetasDTO> => {
+    const response = await api.put<PreferenciasEtiquetasDTO>(
+        `/api/admin/preferencias-etiquetas/${encodeURIComponent(username)}`,
+        body,
+    );
+    return response.data;
 };

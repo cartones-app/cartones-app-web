@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import JSZip from "jszip";
+import { useRef, useState } from "react";
 import { saveAs } from "file-saver";
 import { toast } from "sonner";
 import { Loader2, Download, FileText, Tag, CheckCircle2, AlertTriangle, ArrowLeft, Info, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { downloadPdfs } from "@/lib/api";
+import { useProcesoStore } from "@/store/useProcesoStore";
 
 interface PdfDownloaderProps {
     procesoId: string;
@@ -21,6 +21,7 @@ interface ExtractedFiles {
 }
 
 export function PdfDownloader({ procesoId, onBack, onReset }: PdfDownloaderProps) {
+    const marcarProcesoCompletado = useProcesoStore((s) => s.marcarProcesoCompletado);
     const [isLoading, setIsLoading] = useState(false);
     const [extractedFiles, setExtractedFiles] = useState<ExtractedFiles>({
         etiquetas: null,
@@ -29,6 +30,10 @@ export function PdfDownloader({ procesoId, onBack, onReset }: PdfDownloaderProps
     const [isExtracted, setIsExtracted] = useState(false);
     const [hasBeenGenerated, setHasBeenGenerated] = useState(false);
     const [downloadError, setDownloadError] = useState(false);
+    // Apuntamos al banner de éxito para hacer scroll cuando se generan
+    // los archivos — si no, la sección de descarga queda fuera del viewport
+    // y el usuario no se entera de que ya puede bajar los PDFs.
+    const successRef = useRef<HTMLDivElement | null>(null);
 
     const handleGenerateFiles = async () => {
         // Prevent multiple calls - one-shot endpoint
@@ -46,7 +51,10 @@ export function PdfDownloader({ procesoId, onBack, onReset }: PdfDownloaderProps
             // Download the ZIP file - ONE-SHOT, can only be called once
             const zipBlob = await downloadPdfs(procesoId);
 
-            // Use JSZip to extract the contents
+            // JSZip dynamic import: dep pesado (~80KB) que solo necesitamos
+            // al momento de extraer. No quemarlo en el bundle inicial de
+            // /resultados, que ya carga 3 cards pesadas.
+            const { default: JSZip } = await import("jszip");
             const zip = await JSZip.loadAsync(zipBlob);
 
             let etiquetasFile: Blob | null = null;
@@ -80,9 +88,20 @@ export function PdfDownloader({ procesoId, onBack, onReset }: PdfDownloaderProps
             });
             setIsExtracted(true);
             setHasBeenGenerated(true);
+            // En el backend este endpoint transiciona el proceso a COMPLETADO.
+            // Marcamos el flag para que /upload no muestre el banner de
+            // "sesión activa" si el user vuelve a navegar a esa página.
+            marcarProcesoCompletado();
 
             toast.success("Archivos generados", {
                 description: "Los PDFs están listos para descargar.",
+            });
+
+            // Scroll suave al banner de éxito en el siguiente tick para que
+            // el usuario vea inmediatamente que la generación terminó y dónde
+            // están los botones de descarga.
+            requestAnimationFrame(() => {
+                successRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
             });
         } catch {
             // Error handled by axios interceptor
@@ -174,7 +193,10 @@ export function PdfDownloader({ procesoId, onBack, onReset }: PdfDownloaderProps
                     ) : (
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             {/* Success indicator */}
-                            <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-sm text-emerald-600 dark:text-emerald-400">
+                            <div
+                                ref={successRef}
+                                className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-sm text-emerald-600 dark:text-emerald-400 scroll-mt-24"
+                            >
                                 <p className="flex items-center gap-2">
                                     <CheckCircle2 className="h-4 w-4" />
                                     Archivos listos. Puedes descargarlos las veces que necesites.
@@ -257,6 +279,73 @@ export function PdfDownloader({ procesoId, onBack, onReset }: PdfDownloaderProps
                     </CardContent>
                 </Card>
             )}
+
+            {/*
+              Floating Action Dock — replica el patrón de /configuracion. Las
+              acciones críticas quedan siempre visibles sin tener que scrollear
+              hasta el final de la tabla de resultados.
+            */}
+            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-2xl bg-background/75 backdrop-blur-lg border border-border/40 shadow-xl rounded-full p-2 flex items-center justify-end gap-2">
+                {!isExtracted ? (
+                    <>
+                        <Button
+                            onClick={onBack}
+                            disabled={isLoading}
+                            variant="ghost"
+                            size="sm"
+                            className="rounded-full"
+                        >
+                            <ArrowLeft className="h-4 w-4 mr-2" />
+                            Volver
+                        </Button>
+                        <Button
+                            onClick={handleGenerateFiles}
+                            disabled={isLoading}
+                            size="sm"
+                            className="rounded-full shadow-sm"
+                        >
+                            {isLoading ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Generando...
+                                </>
+                            ) : (
+                                <>
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Generar Archivos
+                                </>
+                            )}
+                        </Button>
+                    </>
+                ) : (
+                    <>
+                        {/*
+                          Post-generación: los botones de descarga viven acá para que el usuario
+                          no tenga que scrollear hasta el card. "Iniciar Nuevo Proceso" queda
+                          solo en la card destacada — es una acción terminal, no urgente.
+                        */}
+                        <Button
+                            onClick={handleDownloadEtiquetas}
+                            disabled={!extractedFiles.etiquetas}
+                            variant="outline"
+                            size="sm"
+                            className="rounded-full shadow-sm"
+                        >
+                            <Tag className="h-4 w-4 mr-2" />
+                            <span className="hidden sm:inline">Descargar</span> Etiquetas
+                        </Button>
+                        <Button
+                            onClick={handleDownloadResumen}
+                            disabled={!extractedFiles.resumen}
+                            size="sm"
+                            className="rounded-full shadow-sm"
+                        >
+                            <FileText className="h-4 w-4 mr-2" />
+                            <span className="hidden sm:inline">Descargar</span> Resumen
+                        </Button>
+                    </>
+                )}
+            </div>
         </div>
     );
 }

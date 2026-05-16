@@ -1,68 +1,54 @@
 name: CI
 
+# Build verification + lint para el frontend Next.js.
+# Corre en GitHub-hosted ubuntu-latest (gratis, no carga el self-hosted).
+# Triggers:
+#   - PRs hacia next/develop/master → build (R1)
+#   - Pushes a next/develop → verifica que el merge resultante compila (R8)
+#
+# Vercel observa este workflow vía la integración nativa de GitHub: cuando
+# CI termina verde sobre develop, dispara el deploy a Vercel.
+# El alias staging (cartones-app-web-staging.vercel.app) se reasigna en
+# .github/workflows/staging-alias.yml — un workflow separado que corre
+# DESPUÉS de CI (workflow_run) para no bloquear a Vercel.
+
 on:
   pull_request:
-    branches: [develop, master]
+    branches: [next, develop, master]
   push:
-    branches: [develop]
+    branches: [next, develop]
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: npm
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run build
-
-  deploy-staging:
-    needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
-    runs-on: ubuntu-latest
     timeout-minutes: 15
-    steps:
-      - name: Wait for CodeQL to succeed on this commit
-        uses: lewagon/wait-on-check-action@v1.3.4
-        with:
-          ref: ${{ github.sha }}
-          check-name: "CodeQL / Analyze (javascript-typescript)"
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          wait-interval: 15
-          allowed-conclusions: success
-      - name: Trigger Vercel deploy hook
-        env:
-          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
-        run: |
-          if [ -z "$HOOK" ]; then echo "Missing VERCEL_DEPLOY_HOOK_URL secret"; exit 1; fi
-          curl -fSs -X POST "$HOOK" | head -c 500; echo
 
-      - name: Re-aliasear cartones-app-web-staging.vercel.app al nuevo deploy
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: |
-          if [ -z "$VERCEL_TOKEN" ]; then echo "Missing VERCEL_TOKEN secret"; exit 1; fi
-          # Esperar hasta 10 min a que aparezca un deployment READY para este commit.
-          # Vercel actualmente tiene develop seteado como productionBranch — el deploy
-          # entra como target=production aunque conceptualmente es staging.
-          DEPLOY=""
-          for i in $(seq 1 60); do
-            DEPLOY=$(curl -fsS -H "Authorization: Bearer $VERCEL_TOKEN" \
-              "https://api.vercel.com/v6/deployments?app=cartones-app-web&state=READY&limit=10" \
-              | jq -r --arg sha "$GITHUB_SHA" '.deployments[] | select(.meta.githubCommitSha == $sha) | .url' | head -n1)
-            if [ -n "$DEPLOY" ]; then break; fi
-            sleep 10
-          done
-          if [ -z "$DEPLOY" ]; then
-            echo "No READY deployment for $GITHUB_SHA after 10 min"; exit 1
-          fi
-          echo "Aliasing https://$DEPLOY -> cartones-app-web-staging.vercel.app"
-          npx --yes vercel@53 alias set "https://$DEPLOY" cartones-app-web-staging.vercel.app --token "$VERCEL_TOKEN"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        # Lee la versión de `packageManager` en package.json — un solo lugar
+        # de verdad para la versión de pnpm en local y en CI.
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        # --frozen-lockfile: equivalente a `npm ci` — falla si el lockfile no
+        # matchea package.json (evita drift silencioso en CI).
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Build
+        run: pnpm run build

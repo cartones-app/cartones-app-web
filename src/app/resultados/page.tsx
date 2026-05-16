@@ -3,12 +3,12 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Sparkles, CheckCircle2 } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { WizardStepper } from "@/components/WizardStepper";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { ResultsTable } from "@/components/ResultsTable";
 import { PdfDownloader } from "@/components/PdfDownloader";
 import { useProcesoStore } from "@/store/useProcesoStore";
+import { shortId } from "@/lib/format-id";
 
 export default function ResultadosPage() {
     const router = useRouter();
@@ -44,33 +44,19 @@ export default function ResultadosPage() {
     }
 
     return (
-        <div className="min-h-screen relative overflow-hidden">
-            {/* Background */}
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-background" />
-            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-            <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-emerald-500/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+        <div className="relative overflow-hidden">
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-background" />
+                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+                <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-emerald-500/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+            </div>
 
-            {/* Content */}
-            <div className="relative z-10">
-                {/* Header */}
-                <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-20">
-                    <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Sparkles className="h-6 w-6 text-primary" />
-                            <h1 className="font-semibold text-lg">Gestión de Bingos</h1>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground hidden sm:block">
-                                Proceso: {procesoId?.slice(0, 8)}...
-                            </span>
-                            <ThemeToggle />
-                        </div>
-                    </div>
-                </header>
-
-                {/* Wizard Stepper */}
-                <div className="container mx-auto px-4 pt-8">
+            <div className="relative">
+                <div className="container mx-auto px-4 pt-8 flex items-center justify-between gap-2 flex-wrap">
                     <WizardStepper currentStep={3} />
+                    <span className="text-xs text-muted-foreground hidden sm:block">
+                        Proceso: {shortId(procesoId)}
+                    </span>
                 </div>
 
                 {/* Success Banner */}
@@ -88,8 +74,8 @@ export default function ResultadosPage() {
                     </div>
                 </div>
 
-                {/* Main Content */}
-                <main className="container mx-auto px-4 py-8 space-y-6">
+                {/* Main Content — pb-24 para que el floating dock de PdfDownloader no tape la última card. */}
+                <main className="container mx-auto px-4 py-8 pb-24 space-y-6">
                     <ResultsTable resultados={resultados} />
 
                     <PdfDownloader
