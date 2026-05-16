@@ -3,11 +3,18 @@ import { getSession, signIn } from 'next-auth/react';
 import { toast } from 'sonner';
 import { BackendErrorResponse } from '@/types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
-
-if (!API_BASE_URL) {
-    console.warn('NEXT_PUBLIC_API_URL is not defined in environment variables');
-}
+/**
+ * baseURL del cliente: SAME-ORIGIN via el proxy interno de Next (ver
+ * `next.config.ts` → rewrites). El browser nunca llega directo al backend —
+ * todas las llamadas van a `/api-proxy/api/...` y Next forwardea internamente.
+ *
+ * Beneficios:
+ *  - La URL real del backend queda fuera del bundle del cliente.
+ *  - CORS deja de ser problema (todo es same-origin).
+ *  - En prod, el backend puede no exponer puerto público — solo accesible
+ *    via DNS interno docker desde Next y nginx.
+ */
+const API_BASE_URL = '/api-proxy';
 
 // Flag de modulo para dedup de re-login: si varias requests reciben 401 al
 // mismo tiempo, solo una dispara signIn() (el resto queda en flight hasta el

@@ -57,7 +57,10 @@ export async function obtenerFlagsPublicosServer(): Promise<PublicFeatureFlags |
     const session = await auth();
     if (!session?.accessToken) return null;
 
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+    // Server-side fetcheamos contra la URL interna directa (no pasamos por
+    // el rewrite del frontend porque ya estamos en el server). Coincide con
+    // la var que next.config.ts valida en startup.
+    const baseUrl = process.env.BACKEND_INTERNAL_URL;
     if (!baseUrl) return null;
 
     return fetchFlagsCached(session.accessToken, baseUrl);
