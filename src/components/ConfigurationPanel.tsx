@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { Calendar as CalendarIcon, Loader2, Plus, Trash2, Play, ArrowRight, ArrowLeft, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -79,25 +79,39 @@ export function ConfigurationPanel({
     isSimulating,
     hasSimulated,
     onVerResultados,
-    // New props
     vendedores,
     vendedorInputs,
     onUpdateVendedor,
     resultados,
     showResultsPreview,
     setShowResultsPreview,
-}: ConfigurationPanelProps) {
+}: Readonly<ConfigurationPanelProps>) {
     const [searchTerm, setSearchTerm] = useState("");
+    // useDeferredValue: el input se actualiza en cada keystroke (responsive),
+    // pero el filtering pesado contra `vendedorInputs` y `resultados` se
+    // calcula contra un valor diferido. Con N=200+ vendedores, evita
+    // freezear el input mientras React re-renderiza el accordion/tabla.
+    const deferredSearch = useDeferredValue(searchTerm);
+    const normalizedSearch = deferredSearch.toLowerCase();
 
-    // Filter logic
-    const filteredVendedores = vendedorInputs.filter(v =>
-        v.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        v.id.toString().includes(searchTerm)
+    const filteredVendedores = useMemo(
+        () =>
+            vendedorInputs.filter(
+                (v) =>
+                    v.nombre.toLowerCase().includes(normalizedSearch) ||
+                    v.id.toString().includes(deferredSearch),
+            ),
+        [vendedorInputs, normalizedSearch, deferredSearch],
     );
 
-    const filteredResultados = resultados.filter(r =>
-        r.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.id.toString().includes(searchTerm)
+    const filteredResultados = useMemo(
+        () =>
+            resultados.filter(
+                (r) =>
+                    r.nombre.toLowerCase().includes(normalizedSearch) ||
+                    r.id.toString().includes(deferredSearch),
+            ),
+        [resultados, normalizedSearch, deferredSearch],
     );
     const addPoolRange = (type: "senete" | "telebingo") => {
         const newRange = { inicio: "", fin: "" };

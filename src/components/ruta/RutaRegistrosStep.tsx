@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useCallback, useState } from "react";
 import { Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,10 +46,13 @@ export function RutaRegistrosStep({
     registros: registrosIniciales,
     onExportar,
     cargando,
-}: RutaRegistrosStepProps) {
+}: Readonly<RutaRegistrosStepProps>) {
     const [registros, setRegistros] = useState<RegistroRutaDTO[]>(registrosIniciales);
 
-    const actualizar = (idx: number, campo: EditableField, valor: string) => {
+    // useCallback con [] de deps: la función es estable entre renders, lo que
+    // permite que el React.memo de RegistroRow compare por referencia y
+    // saltee los rerenders de filas no tocadas en cada keystroke.
+    const actualizar = useCallback((idx: number, campo: EditableField, valor: string) => {
         setRegistros((prev) => {
             const next = [...prev];
             const reg = { ...next[idx] };
@@ -62,7 +65,7 @@ export function RutaRegistrosStep({
             next[idx] = reg;
             return next;
         });
-    };
+    }, []);
 
     const totalCompletados = registros.filter((r) => esCompletado(r)).length;
 
@@ -114,31 +117,12 @@ export function RutaRegistrosStep({
                     </TableHeader>
                     <TableBody>
                         {registros.map((r, idx) => (
-                            <TableRow key={`${r.vendedorId}-${r.fecha}-${r.numeroFila}`}>
-                                <TableCell className="font-medium whitespace-nowrap">
-                                    {r.nombre}
-                                </TableCell>
-                                <TableCell className="font-mono text-xs whitespace-nowrap">
-                                    {r.fecha}
-                                </TableCell>
-                                {NUMERIC_FIELDS.map((f) => (
-                                    <TableCell key={f} className="text-right">
-                                        <NumericInput
-                                            value={r[f] as number | null}
-                                            onChange={(v) => actualizar(idx, f, v)}
-                                            aria-label={`${f} de ${r.nombre}`}
-                                        />
-                                    </TableCell>
-                                ))}
-                                <TableCell>
-                                    <Input
-                                        value={r.nota ?? ""}
-                                        onChange={(e) => actualizar(idx, "nota", e.target.value)}
-                                        className="h-8 min-w-[120px]"
-                                        aria-label={`Nota de ${r.nombre}`}
-                                    />
-                                </TableCell>
-                            </TableRow>
+                            <RegistroRow
+                                key={`${r.vendedorId}-${r.fecha}-${r.numeroFila}`}
+                                registro={r}
+                                idx={idx}
+                                onActualizar={actualizar}
+                            />
                         ))}
                     </TableBody>
                 </Table>
@@ -146,6 +130,49 @@ export function RutaRegistrosStep({
         </div>
     );
 }
+
+/**
+ * Una fila de la tabla. {@link memo} para que el keystroke en una fila
+ * solo re-renderice esa fila — sin la memoización, con N=100 filas y 11
+ * inputs cada una, cada tecla disparaba un re-render de 1100 inputs.
+ *
+ * Las props {@code registro} (referencia nueva solo para la fila tocada) e
+ * {@code idx} bastan para comparación por referencia. {@code onActualizar}
+ * es estable por {@code useCallback([])} en el padre.
+ */
+const RegistroRow = memo(function RegistroRow({
+    registro,
+    idx,
+    onActualizar,
+}: {
+    registro: RegistroRutaDTO;
+    idx: number;
+    onActualizar: (idx: number, campo: EditableField, valor: string) => void;
+}) {
+    return (
+        <TableRow>
+            <TableCell className="font-medium whitespace-nowrap">{registro.nombre}</TableCell>
+            <TableCell className="font-mono text-xs whitespace-nowrap">{registro.fecha}</TableCell>
+            {NUMERIC_FIELDS.map((f) => (
+                <TableCell key={f} className="text-right">
+                    <NumericInput
+                        value={registro[f] as number | null}
+                        onChange={(v) => onActualizar(idx, f, v)}
+                        aria-label={`${f} de ${registro.nombre}`}
+                    />
+                </TableCell>
+            ))}
+            <TableCell>
+                <Input
+                    value={registro.nota ?? ""}
+                    onChange={(e) => onActualizar(idx, "nota", e.target.value)}
+                    className="h-8 min-w-[120px]"
+                    aria-label={`Nota de ${registro.nombre}`}
+                />
+            </TableCell>
+        </TableRow>
+    );
+});
 
 function NumericInput({
     value,
