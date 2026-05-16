@@ -28,21 +28,18 @@ Cliente Next.js para el sistema de gestión de cartones de bingo (Senete y Teleb
 | Rama | Uso | Despliegue |
 |------|-----|-----------|
 | `master` | Producción | Push → workflow `deploy-vps.yml` → VPS |
-| `develop` | Staging | Push → CI + CodeQL → al pasar, Vercel deploya nativo + workflow `staging-alias.yml` reasigna `cartones-app-web-staging.vercel.app` al nuevo deploy |
+| `develop` | Staging | Push → CI + CodeQL → al pasar, dispara Vercel Deploy Hook → Vercel (`cartones-app-web.vercel.app`) |
 
-Vercel tiene `Wait for CI` activado: solo deploya `develop` cuando los workflows GitHub Actions están en `success`. El alias custom de staging se actualiza vía un workflow separado (`staging-alias.yml`) que escucha `workflow_run` sobre CI.
+Vercel tiene `Auto-deploy on git push = disabled`. El único disparador del deploy de staging es el job `deploy-staging` de `ci.yml`, que solo corre si `build` y `CodeQL` terminan en `success`.
 
 ---
 
 ## Arranque local
 
-Este repo usa **pnpm** (no npm) por el aislamiento estricto de módulos y la supply-chain protection. La versión está pinneada en `packageManager` de `package.json` y la maneja Corepack automáticamente.
-
 ```bash
-corepack enable pnpm@latest    # una sola vez si nunca lo usaste
-pnpm install
-cp .env.example .env.local     # crear con NEXT_PUBLIC_API_URL si no existe
-pnpm run dev
+npm install
+cp .env.example .env.local   # crear con NEXT_PUBLIC_API_URL si no existe
+npm run dev
 ```
 
 Abrir [http://localhost:3000](http://localhost:3000).
@@ -78,24 +75,11 @@ Usuarios demo del realm (passwords temporales, cambiar al primer login):
 ## Scripts
 
 ```bash
-pnpm run dev     # dev server (Turbopack)
-pnpm run build   # build de producción
-pnpm run start   # servir el build
-pnpm run lint    # ESLint
+npm run dev     # dev server (Turbopack)
+npm run build   # build de producción
+npm run start   # servir el build
+npm run lint    # ESLint
 ```
-
-### Aprobar install scripts de paquetes nuevos
-
-pnpm 11 bloquea por defecto los install scripts de paquetes recién agregados
-(mitigación de supply-chain attacks). Si al instalar aparece:
-
-```
-[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: foo@1.0.0
-```
-
-Editá `pnpm-workspace.yaml` y agregalo a `allowBuilds:`, marcándolo `true`
-(si auditaste el script y lo querés correr) o `false` (si querés mantenerlo
-bloqueado explícitamente).
 
 ---
 
