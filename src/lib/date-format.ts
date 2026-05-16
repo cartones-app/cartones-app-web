@@ -51,11 +51,24 @@ export function formatFechaHora(iso: string | null | undefined): string {
 /**
  * Formato corto "DD/MM HH:mm" en el huso horario del usuario. Para listados
  * compactos donde el año no aporta.
+ *
+ * Reconstruimos el string a partir de `formatToParts` porque `toLocaleString`
+ * con `2-digit` en es-AR ignora el padding cuando NO hay `year` en las opts
+ * (variantes de ICU devuelven "16/5, 22:00" en lugar de "16/05, 22:00"). Esto
+ * mantiene el contrato DD/MM independiente de la versión de Node/ICU.
  */
 export function formatFechaHoraCorta(iso: string | null | undefined): string {
     if (!iso) return "—";
     try {
-        return parseBackendIso(iso).toLocaleString("es-AR", FECHA_HORA_CORTA_OPTS);
+        const parts = new Intl.DateTimeFormat("es-AR", FECHA_HORA_CORTA_OPTS)
+            .formatToParts(parseBackendIso(iso));
+        const get = (type: Intl.DateTimeFormatPartTypes) =>
+            parts.find((p) => p.type === type)?.value ?? "";
+        const dd = get("day").padStart(2, "0");
+        const mm = get("month").padStart(2, "0");
+        const hh = get("hour").padStart(2, "0");
+        const min = get("minute").padStart(2, "0");
+        return `${dd}/${mm}, ${hh}:${min}`;
     } catch {
         return iso;
     }

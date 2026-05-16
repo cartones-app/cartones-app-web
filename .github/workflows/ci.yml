@@ -50,5 +50,11 @@ jobs:
       - name: Lint
         run: pnpm run lint
 
+      - name: Test
+        # Vitest run no-watch. Antes del build para fallar rápido si hay
+        # regresiones de lógica (un build verde con tests rojos no debería
+        # llegar a Vercel).
+        run: pnpm run test
+
       - name: Build
         run: pnpm run build
