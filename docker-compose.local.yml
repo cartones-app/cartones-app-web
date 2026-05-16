@@ -34,6 +34,7 @@ services:
   frontend:
     image: node:22-alpine
     container_name: cartones_frontend_dev
+    restart: unless-stopped
     working_dir: /app
     # corepack habilita la versión pinneada de pnpm (packageManager en package.json).
     # Hace install solo si no existe node_modules (volume montado), después dev.
