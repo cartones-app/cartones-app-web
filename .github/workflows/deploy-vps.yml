@@ -5,12 +5,15 @@ name: Deploy frontend to VPS (prod)
 #
 # Topología:
 #   Internet → Cloudflare (rgq-cartones.eliasg.uk) → tunnel → nginx-proxy → cartones_frontend:3000
-# El frontend hace fetch a https://cartones.eliasg.uk (backend) — son CORS cross-origin
-# resueltos por APP_CORS_ORIGINS del backend.
+# El frontend (Next) hace fetch al backend SOLO server-side a la URL interna
+# (BACKEND_INTERNAL_URL=http://backend:9001, DNS docker en la network "proxy").
+# El browser nunca llega directo al backend — habla con Next en same-origin
+# vía rewrites /api-proxy/* (ver next.config.ts). Backend no necesita CORS
+# para este origin, y puede no publicar puerto público.
 #
 # Variables y Secrets en GitHub (Settings → Secrets and variables → Actions):
 #   Variables:
-#     NEXT_PUBLIC_API_URL=https://cartones.eliasg.uk
+#     BACKEND_INTERNAL_URL=http://backend:9001  (DNS interno docker)
 #     NEXTAUTH_URL=https://rgq-cartones.eliasg.uk
 #     AUTH_KEYCLOAK_ISSUER=https://<keycloak-host>/realms/<realm>
 #     HEALTH_URL=https://rgq-cartones.eliasg.uk (opcional, smoke test)
@@ -58,7 +61,7 @@ jobs:
         run: |
           umask 077
           cat > .env <<EOF
-          NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
+          BACKEND_INTERNAL_URL=${{ vars.BACKEND_INTERNAL_URL }}
           NEXTAUTH_URL=${{ vars.NEXTAUTH_URL }}
           AUTH_KEYCLOAK_ISSUER=${{ vars.AUTH_KEYCLOAK_ISSUER }}
           AUTH_SECRET=${{ secrets.AUTH_SECRET }}

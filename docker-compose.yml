@@ -2,15 +2,17 @@ services:
   frontend:
     build:
       context: .
-      args:
-        # NEXT_PUBLIC_* se bakea en el bundle al build.
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     container_name: cartones_frontend
     restart: always
     environment:
       NODE_ENV: production
       PORT: 3000
       HOSTNAME: 0.0.0.0
+      # URL interna del backend (NO NEXT_PUBLIC_): el Next server la usa para
+      # los rewrites de /api-proxy/*. En esta network "proxy" el backend
+      # resuelve por DNS interno docker como `backend:9001`. El browser NUNCA
+      # ve esta URL — solo habla con Next en same-origin.
+      BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://backend:9001}
       # NextAuth runtime — sin estos, el login OIDC no inicializa.
       # Vienen del .env que el workflow genera leyendo GitHub Variables/Secrets.
       NEXTAUTH_URL: ${NEXTAUTH_URL}

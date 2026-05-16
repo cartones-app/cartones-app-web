@@ -50,9 +50,12 @@ services:
         exec pnpm dev
     environment:
       # Defaults alineados al realm que importa el backend:
-      #   client "frontend" (publicClient + PKCE), realm "cartones".
+      #   client "frontend" (confidential + PKCE), realm "cartones".
       # Pueden overridearse exportando antes de levantar compose.
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:9001}
+      # BACKEND_INTERNAL_URL (NO NEXT_PUBLIC_): solo el Next server la usa
+      # para los rewrites de /api-proxy/*. Con network_mode: host, localhost
+      # del container resuelve a localhost del host = donde Spring publica.
+      BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://localhost:9001}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
       AUTH_SECRET: ${AUTH_SECRET:-local-dev-secret-do-not-use-in-prod}
       AUTH_KEYCLOAK_ID: ${AUTH_KEYCLOAK_ID:-frontend}

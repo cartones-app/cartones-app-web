@@ -51,8 +51,4 @@ jobs:
         run: pnpm run lint
 
       - name: Build
-        env:
-          # Valor de relleno para el build de CI — el bundle real para prod
-          # se buildea en el deploy con la URL real desde GitHub Variables.
-          NEXT_PUBLIC_API_URL: https://example.com
         run: pnpm run build
