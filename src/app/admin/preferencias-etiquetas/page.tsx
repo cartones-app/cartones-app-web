@@ -43,6 +43,9 @@ export default function AdminPreferenciasEtiquetasPage() {
     const [draftOrden, setDraftOrden] = useState<OrdenEtiqueta>("SECUENCIAL");
     const [savingUser, setSavingUser] = useState<string | null>(null);
     const [pageIdx, setPageIdx] = useState(0);
+    // Contador que el botón "Recargar" incrementa para re-triggerear el useEffect
+    // sin duplicar la lógica de fetch. Patrón estándar para "refetch manual".
+    const [revision, setRevision] = useState(0);
     const pageSize = 50;
 
     useEffect(() => {
@@ -62,19 +65,9 @@ export default function AdminPreferenciasEtiquetasPage() {
         return () => {
             cancelled = true;
         };
-    }, [pageIdx]);
+    }, [pageIdx, revision]);
 
-    /** Disparable desde el botón "Recargar" — la versión effect-friendly vive dentro del useEffect. */
-    const recargar = async () => {
-        setCargando(true);
-        try {
-            setPage(await listarPreferenciasAdmin(pageIdx, pageSize));
-        } catch {
-            // axios interceptor
-        } finally {
-            setCargando(false);
-        }
-    };
+    const recargar = () => setRevision((r) => r + 1);
 
     const startEdit = (row: PreferenciasEtiquetasDTO) => {
         setEditing(row.username);

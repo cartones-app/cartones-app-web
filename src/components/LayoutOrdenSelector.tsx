@@ -102,6 +102,7 @@ function OptionCard({
             type="button"
             onClick={onClick}
             disabled={disabled}
+            aria-pressed={selected}
             className={cn(
                 "text-left w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg",
                 disabled && "opacity-60 cursor-not-allowed",

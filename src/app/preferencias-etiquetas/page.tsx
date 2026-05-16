@@ -16,10 +16,12 @@ import type { LayoutEtiqueta, OrdenEtiqueta, PreferenciasEtiquetasDTO } from "@/
 import { LayoutOrdenSelector } from "@/components/LayoutOrdenSelector";
 
 /**
- * Pantalla "Mis preferencias de impresión de etiquetas" — propia del distribuidor.
+ * Pantalla "Mis preferencias de impresión de etiquetas" — propia del usuario logueado.
  *
- * El admin puede acceder a la misma para editar la suya (el componente del backend
- * no distingue por rol; los endpoints {@code /api/me/...} usan el sub del JWT).
+ * Aplica al rol DISTRIBUIDOR para configurar sus propias preferencias; el rol
+ * ADMIN puede usarla también pero solo para sus PROPIAS preferencias (los
+ * endpoints {@code /api/me/...} usan el sub del JWT). Para editar las
+ * preferencias de OTRO user, el admin va a {@code /admin/preferencias-etiquetas}.
  */
 export default function PreferenciasEtiquetasPage() {
     const [loading, setLoading] = useState(true);
