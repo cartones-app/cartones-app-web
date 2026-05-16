@@ -1,14 +1,30 @@
 "use client";
 
 import { useState } from "react";
-import { Calendar as CalendarIcon, Plus, Trash2, Play, ArrowRight, ArrowLeft, Search } from "lucide-react";
+import dynamic from "next/dynamic";
+import { Calendar as CalendarIcon, Loader2, Plus, Trash2, Play, ArrowRight, ArrowLeft, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatFechaLarga } from "@/lib/date-format";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
+// react-day-picker pesa ~30KB gz y aporta DOM grande. Las dos fechas son
+// OPCIONALES — la mayoría de los flujos no abren los popovers. next/dynamic
+// con ssr:false (el Calendar es interactivo, no aporta SSR) hace que el chunk
+// se baje solo cuando el user efectivamente abre un popover.
+const Calendar = dynamic(
+    () => import("@/components/ui/calendar").then((m) => m.Calendar),
+    {
+        ssr: false,
+        loading: () => (
+            <div className="flex items-center justify-center p-6 min-h-[280px] min-w-[260px]">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+        ),
+    },
+);
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { PoolRangeForm, VendedorInputDTO, VendedorResponseDTO, VendedorSimuladoDTO } from "@/types";
