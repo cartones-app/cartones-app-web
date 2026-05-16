@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState } from "react";
-import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { toast } from "sonner";
 import { Loader2, Download, FileText, Tag, CheckCircle2, AlertTriangle, ArrowLeft, Info, Plus } from "lucide-react";
@@ -52,7 +51,10 @@ export function PdfDownloader({ procesoId, onBack, onReset }: PdfDownloaderProps
             // Download the ZIP file - ONE-SHOT, can only be called once
             const zipBlob = await downloadPdfs(procesoId);
 
-            // Use JSZip to extract the contents
+            // JSZip dynamic import: dep pesado (~80KB) que solo necesitamos
+            // al momento de extraer. No quemarlo en el bundle inicial de
+            // /resultados, que ya carga 3 cards pesadas.
+            const { default: JSZip } = await import("jszip");
             const zip = await JSZip.loadAsync(zipBlob);
 
             let etiquetasFile: Blob | null = null;

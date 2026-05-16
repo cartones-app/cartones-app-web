@@ -1,5 +1,3 @@
-import JSZip from "jszip";
-
 export interface ExtractedPdfs {
     etiquetas: Blob | null;
     resumen: Blob | null;
@@ -14,8 +12,15 @@ export interface ExtractedPdfs {
  * (etiqueta/label, resumen/summary). Si no hay match por nombre, el primer
  * PDF se asigna como etiquetas y el segundo como resumen (heurística que
  * coincide con cómo el backend arma el ZIP).
+ *
+ * <p>JSZip es un dep pesado (~80KB) que solo se necesita al momento de
+ * descargar. Lo cargamos con dynamic import para no inflarlo en el bundle
+ * de las páginas que solo IMPORTAN {@code descargarArchivoProceso} (vía
+ * la chain {@code lib/proceso-descarga → lib/pdf-from-zip}) pero nunca
+ * lo invocan en el primer render — ej. /upload, /mis-distribuciones.
  */
 export async function extractPdfsFromZip(zipBlob: Blob): Promise<ExtractedPdfs> {
+    const { default: JSZip } = await import("jszip");
     const zip = await JSZip.loadAsync(zipBlob);
 
     let etiquetas: Blob | null = null;
