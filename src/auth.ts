@@ -221,5 +221,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       session.roles = token.roles ?? [];
       return session;
     },
+    /**
+     * Llamado por el middleware de Next en CADA request matcheado (ver
+     * `middleware.ts`). Si devuelve `false`, NextAuth redirige a la
+     * página de signIn. Sin este callback, el middleware solo adjuntaba la
+     * sesión pero no protegía rutas — sólo las páginas que hacían fetch a
+     * la API y caían en 401 disparaban el re-login vía axios interceptor.
+     *
+     * Acá filtramos por sesión válida (con accessToken + sin error de
+     * refresh). Si querés páginas públicas, agregar excepciones por
+     * `pathname` antes del check final.
+     */
+    authorized({ auth: session, request }) {
+      // Acceso público al endpoint de health/manifest si existieran:
+      // const path = request.nextUrl.pathname;
+      // if (path === "/manifest.json") return true;
+      void request;
+      return Boolean(session?.accessToken) && session?.error !== "RefreshAccessTokenError";
+    },
   },
 });
