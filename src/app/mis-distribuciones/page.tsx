@@ -1,14 +1,23 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { FileSpreadsheet, ListChecks, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DistribucionesTable } from "@/components/DistribucionesTable";
 import { PageHeader } from "@/components/PageHeader";
 import { TableSkeleton } from "@/components/TableSkeleton";
 import { listarMisDistribuciones } from "@/lib/api";
 import type { ProcesoDistribucionResumenDTO } from "@/types";
+
+// DistribucionesTable arrastra shadcn Table + lib/proceso-descarga + date-format.
+// La pagina solo la renderiza despues del fetch; cargarla en paralelo con
+// next/dynamic permite que el primer paint (skeleton + header + stats) llegue
+// antes y baja el bundle inicial.
+const DistribucionesTable = dynamic(
+    () => import("@/components/DistribucionesTable").then((m) => m.DistribucionesTable),
+    { ssr: false, loading: () => <TableSkeleton rows={5} columns={6} /> },
+);
 
 export default function MisDistribucionesPage() {
     const [procesos, setProcesos] = useState<ProcesoDistribucionResumenDTO[]>([]);

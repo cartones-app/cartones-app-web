@@ -1,13 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { RefreshCw, Users2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DistribucionesTable } from "@/components/DistribucionesTable";
 import { PageHeader } from "@/components/PageHeader";
 import { TableSkeleton } from "@/components/TableSkeleton";
 import { listarTodasLasDistribuciones } from "@/lib/api";
 import type { ProcesoDistribucionResumenDTO } from "@/types";
+
+// Dynamic — ver justificación en mis-distribuciones/page.tsx.
+const DistribucionesTable = dynamic(
+    () => import("@/components/DistribucionesTable").then((m) => m.DistribucionesTable),
+    { ssr: false, loading: () => <TableSkeleton rows={5} columns={7} /> },
+);
 
 export default function AdminDistribucionesPage() {
     const [procesos, setProcesos] = useState<ProcesoDistribucionResumenDTO[]>([]);
