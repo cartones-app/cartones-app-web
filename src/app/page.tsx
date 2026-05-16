@@ -11,32 +11,61 @@ import {
     type LucideIcon,
 } from "lucide-react";
 import { useUserPermissions } from "@/lib/auth-utils";
-import { NAV_GROUPS } from "@/components/nav/nav-items";
+import {
+    FLAG_PAGE_RUTA,
+    FLAG_PAGE_UPLOAD,
+    FLAG_PAGE_MIS_DISTRIBUCIONES,
+    useFeatureFlags,
+} from "@/components/FeatureFlagsProvider";
+import { NAV_GROUPS, type NavItem } from "@/components/nav/nav-items";
 
-const HERO_HIGHLIGHTS: { title: string; description: string; icon: LucideIcon }[] = [
+interface HeroHighlight {
+    title: string;
+    description: string;
+    icon: LucideIcon;
+    /** Si está, solo se muestra cuando ese flag está habilitado. */
+    flag?: string;
+}
+
+const HERO_HIGHLIGHTS: HeroHighlight[] = [
     {
         title: "Nueva distribución",
         description: "Subí el Excel y simulá la entrega de cartones en minutos.",
         icon: FileSpreadsheet,
+        flag: FLAG_PAGE_UPLOAD,
     },
     {
         title: "Recorrido de ruta",
         description: "Captura puntos de entrega y exportá el archivo cerrado.",
         icon: Route,
+        flag: FLAG_PAGE_RUTA,
     },
     {
         title: "Tus históricos",
         description: "Re-descargá PDFs y revisá lo que ya generaste.",
         icon: ListChecks,
+        flag: FLAG_PAGE_MIS_DISTRIBUCIONES,
     },
 ];
 
 export default function Home() {
     const { esAdmin, displayName, loading, autenticado } = useUserPermissions();
+    const { isEnabled } = useFeatureFlags();
 
-    const principalItems = NAV_GROUPS.find((g) => g.title === "Distribución")?.items ?? [];
-    const rutaItems = NAV_GROUPS.find((g) => g.title === "Recorrido de ruta")?.items ?? [];
+    // Filtrado consistente con el sidebar: si una page está apagada por
+    // feature flag, no aparece en la home tampoco. Una sección que queda sin
+    // items se omite por completo.
+    const filterByFlag = (items: NavItem[]) =>
+        items.filter((i) => !i.flag || isEnabled(i.flag));
+
+    const principalItems = filterByFlag(
+        NAV_GROUPS.find((g) => g.title === "Distribución")?.items ?? [],
+    );
+    const rutaItems = filterByFlag(
+        NAV_GROUPS.find((g) => g.title === "Recorrido de ruta")?.items ?? [],
+    );
     const adminItems = NAV_GROUPS.find((g) => g.admin)?.items ?? [];
+    const heroHighlights = HERO_HIGHLIGHTS.filter((h) => !h.flag || isEnabled(h.flag));
 
     return (
         <div className="relative">
@@ -70,54 +99,60 @@ export default function Home() {
                         </p>
                     </div>
 
-                    <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                        {HERO_HIGHLIGHTS.map((h) => {
-                            const Icon = h.icon;
-                            return (
-                                <div
-                                    key={h.title}
-                                    className="rounded-lg border bg-background/50 p-3.5"
-                                >
-                                    <div className="flex items-center gap-2 mb-1.5">
-                                        <Icon className="h-4 w-4 text-primary" aria-hidden="true" />
-                                        <span className="text-sm font-medium">{h.title}</span>
+                    {heroHighlights.length > 0 && (
+                        <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                            {heroHighlights.map((h) => {
+                                const Icon = h.icon;
+                                return (
+                                    <div
+                                        key={h.title}
+                                        className="rounded-lg border bg-background/50 p-3.5"
+                                    >
+                                        <div className="flex items-center gap-2 mb-1.5">
+                                            <Icon className="h-4 w-4 text-primary" aria-hidden="true" />
+                                            <span className="text-sm font-medium">{h.title}</span>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground leading-relaxed">{h.description}</p>
                                     </div>
-                                    <p className="text-xs text-muted-foreground leading-relaxed">{h.description}</p>
-                                </div>
-                            );
-                        })}
-                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </section>
 
-                <section className="mt-10" aria-labelledby="seccion-distribucion">
-                    <h2
-                        id="seccion-distribucion"
-                        className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2"
-                    >
-                        <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden="true" />
-                        Distribución
-                    </h2>
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {principalItems.map((s) => (
-                            <SectionLink key={s.href} {...s} />
-                        ))}
-                    </div>
-                </section>
+                {principalItems.length > 0 && (
+                    <section className="mt-10" aria-labelledby="seccion-distribucion">
+                        <h2
+                            id="seccion-distribucion"
+                            className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2"
+                        >
+                            <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden="true" />
+                            Distribución
+                        </h2>
+                        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {principalItems.map((s) => (
+                                <SectionLink key={s.href} {...s} />
+                            ))}
+                        </div>
+                    </section>
+                )}
 
-                <section className="mt-10" aria-labelledby="seccion-ruta">
-                    <h2
-                        id="seccion-ruta"
-                        className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2"
-                    >
-                        <Route className="h-3.5 w-3.5" aria-hidden="true" />
-                        Recorrido de ruta
-                    </h2>
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {rutaItems.map((s) => (
-                            <SectionLink key={s.href} {...s} />
-                        ))}
-                    </div>
-                </section>
+                {rutaItems.length > 0 && (
+                    <section className="mt-10" aria-labelledby="seccion-ruta">
+                        <h2
+                            id="seccion-ruta"
+                            className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2"
+                        >
+                            <Route className="h-3.5 w-3.5" aria-hidden="true" />
+                            Recorrido de ruta
+                        </h2>
+                        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {rutaItems.map((s) => (
+                                <SectionLink key={s.href} {...s} />
+                            ))}
+                        </div>
+                    </section>
+                )}
 
                 {esAdmin && (
                     <section className="mt-10" aria-labelledby="seccion-admin">
