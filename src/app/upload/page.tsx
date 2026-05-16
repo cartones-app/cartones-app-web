@@ -26,7 +26,7 @@ const RECIENTES_LIMIT = 4;
 
 export default function UploadPage() {
     const router = useRouter();
-    const { procesoId, setProcesoId, setCurrentStep, reset } = useProcesoStore();
+    const { procesoId, procesoCompletado, setProcesoId, setCurrentStep, reset } = useProcesoStore();
 
     // Defensa contra estado persistido corrupto: hubo un período donde uploadExcel
     // guardaba el DTO entero en lugar del string. Si detectamos eso en localStorage,
@@ -131,8 +131,11 @@ export default function UploadPage() {
                                   El banner aparece por un instante antes de navegar a /configuracion.
                                   `isLoading` se mantiene true hasta que la página se desmonta por
                                   la navegación, así que esta condición lo evita.
+                                  Si el proceso ya está COMPLETADO (archivos generados), tampoco
+                                  mostramos banner — el flujo terminó y queremos que el user
+                                  empiece directamente con un Excel nuevo.
                                 */}
-                                {typeof procesoId === "string" && procesoId && !isLoading ? (
+                                {typeof procesoId === "string" && procesoId && !isLoading && !procesoCompletado ? (
                                     <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-5">
                                         <div className="flex items-start gap-3">
                                             <div className="rounded-full bg-amber-500/15 p-2">

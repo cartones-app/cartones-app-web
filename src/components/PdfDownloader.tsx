@@ -8,6 +8,7 @@ import { Loader2, Download, FileText, Tag, CheckCircle2, AlertTriangle, ArrowLef
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { downloadPdfs } from "@/lib/api";
+import { useProcesoStore } from "@/store/useProcesoStore";
 
 interface PdfDownloaderProps {
     procesoId: string;
@@ -21,6 +22,7 @@ interface ExtractedFiles {
 }
 
 export function PdfDownloader({ procesoId, onBack, onReset }: PdfDownloaderProps) {
+    const marcarProcesoCompletado = useProcesoStore((s) => s.marcarProcesoCompletado);
     const [isLoading, setIsLoading] = useState(false);
     const [extractedFiles, setExtractedFiles] = useState<ExtractedFiles>({
         etiquetas: null,
@@ -84,6 +86,10 @@ export function PdfDownloader({ procesoId, onBack, onReset }: PdfDownloaderProps
             });
             setIsExtracted(true);
             setHasBeenGenerated(true);
+            // En el backend este endpoint transiciona el proceso a COMPLETADO.
+            // Marcamos el flag para que /upload no muestre el banner de
+            // "sesión activa" si el user vuelve a navegar a esa página.
+            marcarProcesoCompletado();
 
             toast.success("Archivos generados", {
                 description: "Los PDFs están listos para descargar.",

@@ -48,11 +48,20 @@ interface ProcesoState {
     // Current wizard step
     currentStep: number;
 
+    /**
+     * true cuando el usuario ya generó los archivos del proceso vía
+     * GET /api/distribuciones/{id}/pdfs (en el backend, eso transiciona a
+     * estado COMPLETADO). Usado por /upload para NO mostrar el banner de
+     * "sesión activa" — si el flujo ya terminó, el user querrá un Excel nuevo.
+     */
+    procesoCompletado: boolean;
+
     // Actions
     setProcesoId: (id: string) => void;
     setVendedores: (vendedores: VendedorResponseDTO[]) => void;
     setResultados: (resultados: VendedorSimuladoDTO[]) => void;
     setCurrentStep: (step: number) => void;
+    marcarProcesoCompletado: () => void;
     /** Actualiza parcialmente la config. No pisa fields que no se pasen. */
     patchConfig: (patch: Partial<ConfigState>) => void;
     resetConfig: () => void;
@@ -65,6 +74,7 @@ const initialState = {
     resultados: [],
     config: emptyConfig,
     currentStep: 1,
+    procesoCompletado: false,
 };
 
 export const useProcesoStore = create<ProcesoState>()(
@@ -83,6 +93,7 @@ export const useProcesoStore = create<ProcesoState>()(
                         vendedores: [],
                         resultados: [],
                         config: emptyConfig,
+                        procesoCompletado: false,
                     });
                 } else {
                     set({ procesoId: id });
@@ -95,6 +106,8 @@ export const useProcesoStore = create<ProcesoState>()(
 
             setCurrentStep: (step) => set({ currentStep: step }),
 
+            marcarProcesoCompletado: () => set({ procesoCompletado: true }),
+
             patchConfig: (patch) => set((s) => ({ config: { ...s.config, ...patch } })),
 
             resetConfig: () => set({ config: emptyConfig }),
@@ -106,6 +119,7 @@ export const useProcesoStore = create<ProcesoState>()(
             partialize: (state) => ({
                 procesoId: state.procesoId,
                 currentStep: state.currentStep,
+                procesoCompletado: state.procesoCompletado,
             }),
         }
     )
