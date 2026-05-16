@@ -19,8 +19,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Gestión de Cartones",
+  // Title template: cada page que exporte su propio title queda como
+  // "Sub-página · Gestión de Cartones". Las pages sin metadata usan el default.
+  title: {
+    default: "Gestión de Cartones",
+    template: "%s · Gestión de Cartones",
+  },
   description: "Sistema de gestión y distribución de cartones.",
+  // App interna: no debe indexarse en buscadores. El robots.ts es la fuente
+  // de verdad para crawlers que respetan /robots.txt; este meta refuerza
+  // para bots que lean el HTML directo (Bing, scrapers, archive.org).
+  robots: { index: false, follow: false },
 };
 
 export default async function RootLayout({
