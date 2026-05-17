@@ -22,11 +22,22 @@ export default defineConfig({
         alias: {
             "@": path.resolve(__dirname, "./src"),
         },
+        // `act` solo se exporta en el build dev de react@19 (react.development.js).
+        // Vitest por default puede resolver al build de producción si la condition
+        // `development` no está activa — forzamos la condition para que `act` esté
+        // disponible para @testing-library/react.
+        conditions: ["development", "browser"],
     },
     test: {
         environment: "jsdom",
+        // `act` solo se exporta en react.development.js. Sin esta env, vitest
+        // hereda NODE_ENV=production y los tests de componentes tiran
+        // "React.act is not a function".
+        env: {
+            NODE_ENV: "development",
+        },
         globals: true,
-        setupFiles: ["./vitest.setup.ts"],
+        setupFiles: ["./vitest.patch-react.ts", "./vitest.setup.ts"],
         include: ["src/__tests__/**/*.{test,spec}.{ts,tsx}"],
         exclude: ["node_modules", ".next", "dist"],
         coverage: {

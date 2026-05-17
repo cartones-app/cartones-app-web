@@ -2,6 +2,12 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, vi } from "vitest";
 import { cleanup } from "@testing-library/react";
 
+// React 18+ test-environment flag — silencia el warning "not wrapped in act".
+// El patch de React.act vive en vitest.patch-react.ts (corre antes que este
+// setup, para llegar antes de que @testing-library/react cachee la referencia).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+
 /**
  * Setup global de Vitest.
  *
