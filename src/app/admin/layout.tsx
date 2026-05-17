@@ -6,16 +6,18 @@ import { rolesIncluyeAdmin } from "@/lib/auth-roles";
 /**
  * Layout que protege TODA la subtree {@code /admin/*}. Server Component —
  * la verificación de rol corre en el server antes de generar HTML, así no
- * hay flash de spinner para los admins legítimos ni para los redirigidos.
+ * hay flash de spinner.
  *
- * <p>Si el user no tiene rol ADMIN: {@code redirect("/")} — Next emite un
- * 307 hacia el home sin renderizar contenido. Si no hay sesión (debería ser
- * imposible porque el middleware redirige a /api/auth/signin), también
- * tiramos al home.
- *
- * <p>Defensa en capas: este check es UX (cero flash) — el backend sigue
- * siendo la verdadera última línea con {@code SecurityConfig} +
- * {@code @PreAuthorize("hasRole('ADMIN')")}.
+ * <p>Capas de protección para esta subtree:
+ *  <ol>
+ *    <li>Middleware ({@code middleware.ts} + {@code evaluarAcceso}) valida
+ *        que haya sesión válida → si no, redirect a {@code /login}.</li>
+ *    <li>Este layout valida el rol ADMIN además de la sesión. Si está
+ *        logueado pero NO es admin, {@code redirect("/")} sin callbackUrl —
+ *        no queremos que vuelva a {@code /admin} tras un eventual relogin.</li>
+ *    <li>Backend con {@code @PreAuthorize("hasRole('ADMIN')")} — última
+ *        línea de defensa real.</li>
+ *  </ol>
  */
 export default async function AdminLayout({ children }: Readonly<{ children: React.ReactNode }>) {
     const session = await auth();

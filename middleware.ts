@@ -25,10 +25,13 @@ export const config = {
         /*
          * Protege todas las rutas excepto:
          * - /api/auth/* (handlers de NextAuth)
-         * - /login (la page propia que dispara el flow OAuth — evita loop)
-         * - /_next/static y /_next/image (assets)
+         * - /login y /login/* (page propia que dispara el flow OAuth — evita loop)
+         * - /_next/static, /_next/image, /_next/data (assets + RSC prefetch payloads)
          * - /favicon.ico, /robots.txt, /sitemap.xml
+         *
+         * El ancla `(?:/|$)` evita que prefijos como /loginandstuff caigan
+         * accidentalmente en la lista de excluidos.
          */
-        "/((?!api/auth|login|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)",
+        "/((?!api/auth|login(?:/|$)|_next/static|_next/image|_next/data|favicon.ico|robots.txt|sitemap.xml).*)",
     ],
 };

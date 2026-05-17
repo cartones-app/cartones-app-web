@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Loader2 } from "lucide-react";
@@ -19,8 +19,14 @@ import { Loader2 } from "lucide-react";
  *     interno de NextAuth y redirige al provider OAuth.
  *
  * UX: el usuario ve un spinner brevísimo antes de saltar a Keycloak.
+ *
+ * Notas de seguridad:
+ *  - El `callbackUrl` se pasa tal cual a `signIn`. NextAuth lo valida
+ *    contra `AUTH_URL` (o el `Host` con `AUTH_TRUST_HOST=true`) antes
+ *    de redirigir, lo que mitiga open-redirect. Es crítico que en prod
+ *    `AUTH_URL` esté seteada al dominio real bajo el proxy reverso.
  */
-export default function LoginPage() {
+function LoginInner() {
     const searchParams = useSearchParams();
 
     useEffect(() => {
@@ -37,5 +43,28 @@ export default function LoginPage() {
                 <p className="text-sm">Redirigiendo al inicio de sesión…</p>
             </div>
         </div>
+    );
+}
+
+/**
+ * `useSearchParams` en client components fuerza al árbol entero a rendering
+ * dinámico salvo que esté dentro de un `<Suspense>` boundary. Sin esto,
+ * Next 16 emite warning en build y no puede streamear el spinner antes de
+ * resolver el query.
+ */
+export default function LoginPage() {
+    return (
+        <Suspense
+            fallback={
+                <div className="flex min-h-screen items-center justify-center">
+                    <Loader2
+                        className="h-6 w-6 animate-spin text-muted-foreground"
+                        aria-hidden="true"
+                    />
+                </div>
+            }
+        >
+            <LoginInner />
+        </Suspense>
     );
 }

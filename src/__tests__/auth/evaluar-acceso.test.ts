@@ -66,13 +66,19 @@ describe("evaluarAcceso", () => {
         expect(result).toBe(true);
     });
 
-    it("con sesión pero error=RefreshAccessTokenError → redirect", () => {
+    it("con sesión pero error=RefreshAccessTokenError → redirect con callbackUrl correcto", () => {
         const result = evaluarAcceso(
             sessionConToken({ error: "RefreshAccessTokenError" } as Partial<Session>),
-            mockRequest("/configuracion"),
+            mockRequest("/configuracion", "?step=2"),
         );
         expect(result).not.toBe(true);
-        expect((result as Response).status).toBe(307);
+        const response = result as Response;
+        expect(response.status).toBe(307);
+        const location = new URL(response.headers.get("location")!);
+        expect(location.pathname).toBe(KEYCLOAK_SIGNIN_PATH);
+        // El callbackUrl debe llevar al user al destino exacto donde estaba,
+        // no a la home — fundamental para que tras re-login no pierda contexto.
+        expect(location.searchParams.get("callbackUrl")).toBe("/configuracion?step=2");
     });
 
     it("con session vacía (sin accessToken) en ruta protegida → redirect", () => {
