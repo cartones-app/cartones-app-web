@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FileArchive, FileText, Loader2, Tag } from "lucide-react";
+import { FileText, Loader2, Tag } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,8 +12,13 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import type { ProcesoDistribucionResumenDTO } from "@/types";
-import { downloadPdfs, downloadPdfsAdmin } from "@/lib/api";
+import { archivosDisponibles, type ProcesoDistribucionResumenDTO } from "@/types";
+import {
+    descargarEtiquetas,
+    descargarEtiquetasAdmin,
+    descargarResumen,
+    descargarResumenAdmin,
+} from "@/lib/api";
 import { formatFechaHora } from "@/lib/date-format";
 import { shortId } from "@/lib/format-id";
 import {
@@ -21,19 +26,12 @@ import {
     ESTADO_PROCESO_COLOR_FALLBACK,
     normalizarEstado,
 } from "@/lib/proceso-estado";
-import { descargarArchivoProceso, type DescargaTipo } from "@/lib/proceso-descarga";
+import { descargarPdfProceso, type DescargaTipo } from "@/lib/proceso-descarga";
 
 interface DistribucionesTableProps {
     procesos: ProcesoDistribucionResumenDTO[];
     /** Si true, muestra columna createdBy y descarga vía endpoint admin. */
     adminMode?: boolean;
-}
-
-function fmtBytes(bytes: number): string {
-    if (!bytes) return "—";
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
 export function DistribucionesTable({ procesos, adminMode = false }: DistribucionesTableProps) {
@@ -42,17 +40,15 @@ export function DistribucionesTable({ procesos, adminMode = false }: Distribucio
     const handleDescargar = async (procesoId: string, tipo: DescargaTipo) => {
         setDescargando({ id: procesoId, tipo });
         try {
-            const ok = await descargarArchivoProceso(
-                procesoId,
-                tipo,
-                adminMode ? downloadPdfsAdmin : downloadPdfs
-            );
-            // Solo confirmamos cuando hubo descarga real. Si el ZIP no tenía
-            // el PDF pedido el helper ya mostró un toast.warning — no agregar
-            // un "Descarga iniciada" encima sería contradictorio.
-            if (ok) {
-                toast.success("Descarga iniciada");
-            }
+            const fetcher = adminMode
+                ? tipo === "etiquetas"
+                    ? descargarEtiquetasAdmin
+                    : descargarResumenAdmin
+                : tipo === "etiquetas"
+                ? descargarEtiquetas
+                : descargarResumen;
+            await descargarPdfProceso(procesoId, tipo, fetcher);
+            toast.success("Descarga iniciada");
         } catch {
             // El interceptor global ya muestra el toast de error.
         } finally {
@@ -83,14 +79,15 @@ export function DistribucionesTable({ procesos, adminMode = false }: Distribucio
                         <TableHead>Proceso</TableHead>
                         {adminMode && <TableHead>Usuario</TableHead>}
                         <TableHead>Estado</TableHead>
-                        <TableHead className="text-right">Etiquetas</TableHead>
-                        <TableHead className="text-right">Resumen</TableHead>
+                        <TableHead>Archivos</TableHead>
                         <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {procesos.map((p) => {
-                        const puedeDescargar = p.tieneEtiquetas || p.tieneResumen;
+                        const disponibles = archivosDisponibles(p);
+                        const yaBorrado = p.archivosBorradosEn !== null;
+                        const sinGenerar = p.archivosGeneradosEn === null;
                         return (
                             <TableRow key={p.procesoId}>
                                 <TableCell className="whitespace-nowrap text-sm">
@@ -118,20 +115,31 @@ export function DistribucionesTable({ procesos, adminMode = false }: Distribucio
                                         );
                                     })()}
                                 </TableCell>
-                                <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
-                                    {fmtBytes(p.tamanoEtiquetasBytes)}
-                                </TableCell>
-                                <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
-                                    {fmtBytes(p.tamanoResumenBytes)}
+                                <TableCell className="text-sm">
+                                    {disponibles ? (
+                                        <span className="text-emerald-600 dark:text-emerald-400">
+                                            Disponibles
+                                        </span>
+                                    ) : yaBorrado ? (
+                                        <span className="text-muted-foreground">No disponibles</span>
+                                    ) : sinGenerar ? (
+                                        <span className="text-muted-foreground">Sin generar</span>
+                                    ) : (
+                                        <span className="text-muted-foreground">—</span>
+                                    )}
                                 </TableCell>
                                 <TableCell className="text-right">
                                     <div className="inline-flex items-center gap-1">
                                         <Button
                                             size="sm"
                                             variant="ghost"
-                                            disabled={!p.tieneEtiquetas || isBusy(p.procesoId, "etiquetas")}
+                                            disabled={!disponibles || isBusy(p.procesoId, "etiquetas")}
                                             onClick={() => handleDescargar(p.procesoId, "etiquetas")}
-                                            title="Descargar solo etiquetas (PDF)"
+                                            title={
+                                                disponibles
+                                                    ? "Descargar etiquetas (PDF)"
+                                                    : "Archivos no disponibles"
+                                            }
                                             aria-label="Descargar etiquetas"
                                         >
                                             {isBusy(p.procesoId, "etiquetas") ? (
@@ -143,9 +151,13 @@ export function DistribucionesTable({ procesos, adminMode = false }: Distribucio
                                         <Button
                                             size="sm"
                                             variant="ghost"
-                                            disabled={!p.tieneResumen || isBusy(p.procesoId, "resumen")}
+                                            disabled={!disponibles || isBusy(p.procesoId, "resumen")}
                                             onClick={() => handleDescargar(p.procesoId, "resumen")}
-                                            title="Descargar solo resumen (PDF)"
+                                            title={
+                                                disponibles
+                                                    ? "Descargar resumen (PDF)"
+                                                    : "Archivos no disponibles"
+                                            }
                                             aria-label="Descargar resumen"
                                         >
                                             {isBusy(p.procesoId, "resumen") ? (
@@ -153,20 +165,6 @@ export function DistribucionesTable({ procesos, adminMode = false }: Distribucio
                                             ) : (
                                                 <FileText className="h-4 w-4" />
                                             )}
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            disabled={!puedeDescargar || isBusy(p.procesoId, "zip")}
-                                            onClick={() => handleDescargar(p.procesoId, "zip")}
-                                            title="Descargar ZIP completo"
-                                        >
-                                            {isBusy(p.procesoId, "zip") ? (
-                                                <Loader2 className="h-4 w-4" />
-                                            ) : (
-                                                <FileArchive className="h-4 w-4" />
-                                            )}
-                                            <span className="ml-2 hidden sm:inline">ZIP</span>
                                         </Button>
                                     </div>
                                 </TableCell>

@@ -50,9 +50,10 @@ interface ProcesoState {
 
     /**
      * true cuando el usuario ya generó los archivos del proceso vía
-     * GET /api/distribuciones/{id}/pdfs (en el backend, eso transiciona a
-     * estado COMPLETADO). Usado por /upload para NO mostrar el banner de
-     * "sesión activa" — si el flujo ya terminó, el user querrá un Excel nuevo.
+     * POST /api/distribuciones/{id}/archivos (en el backend, eso transiciona
+     * a estado COMPLETADO). Usado por /upload para NO mostrar el banner de
+     * "sesión activa" y por PdfDownloader para mostrar directamente los
+     * botones de descarga si el usuario vuelve a /resultados.
      */
     procesoCompletado: boolean;
 

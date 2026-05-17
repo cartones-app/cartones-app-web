@@ -51,17 +51,45 @@ export interface BackendErrorResponse {
 }
 
 // Resumen de un ProcesoDistribucion para listados.
-// Backend: ProcesoDistribucionResumenDTO. NO incluye los PDFs (BLOBs).
+// Backend: ProcesoDistribucionResumenDTO. Los PDFs ya no se guardan en DB —
+// el estado se deriva de los timestamps: disponibles ⇔ generados != null && borrados == null.
 export interface ProcesoDistribucionResumenDTO {
     procesoId: string;
     estado: string;
     createdAt: string; // ISO 8601 (LocalDateTime serializado)
     updatedAt: string;
     createdBy: string;
-    tieneEtiquetas: boolean;
-    tieneResumen: boolean;
-    tamanoEtiquetasBytes: number;
-    tamanoResumenBytes: number;
+    archivosGeneradosEn: string | null;
+    archivosBorradosEn: string | null;
+}
+
+/** Helper de UI: ¿se puede descargar este proceso ahora mismo? */
+export function archivosDisponibles(p: ProcesoDistribucionResumenDTO): boolean {
+    return p.archivosGeneradosEn !== null && p.archivosBorradosEn === null;
+}
+
+/** Backend: ArchivosGeneradosDTO. Response del POST /api/distribuciones/{id}/archivos. */
+export interface ArchivosGeneradosDTO {
+    procesoId: string;
+    archivosGeneradosEn: string;
+}
+
+// ============================================================================
+// Configuración de archivos (admin)
+// ============================================================================
+
+/** Backend: ConfiguracionArchivosDTO. GET /api/admin/configuracion-archivos. */
+export interface ConfiguracionArchivosDTO {
+    retencionMeses: number;
+    eliminacionActiva: boolean;
+    updatedAt: string;
+    modifiedBy: string | null;
+}
+
+/** Backend: ActualizarConfiguracionArchivosRequest. PUT /api/admin/configuracion-archivos. */
+export interface ActualizarConfiguracionArchivosRequest {
+    retencionMeses: number;
+    eliminacionActiva: boolean;
 }
 
 // ============================================================================

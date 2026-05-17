@@ -1,55 +1,24 @@
 import { saveAs } from "file-saver";
-import { toast } from "sonner";
-
-import { extractPdfsFromZip } from "@/lib/pdf-from-zip";
 
 /** Tipo de archivo a descargar de un proceso de distribución. */
-export type DescargaTipo = "etiquetas" | "resumen" | "zip";
+export type DescargaTipo = "etiquetas" | "resumen";
 
 /**
- * Descarga un PDF (etiquetas / resumen) o el ZIP completo de un proceso.
+ * Descarga el PDF (etiquetas o resumen) de un proceso. El backend ya no devuelve
+ * ZIP — cada PDF tiene su propio endpoint y se baja en streaming via sendfile.
  *
- * <p>El caller pasa el fetcher (ej: `downloadPdfs` o `downloadPdfsAdmin`)
- * para que el helper no conozca el endpoint — usa el que corresponde según
- * el contexto (DISTRIBUIDOR vs ADMIN, etc.).
- *
- * <p><b>Retorno</b>: {@code true} si la descarga efectivamente se gatilló
- * (el {@code saveAs} corrió). {@code false} si el ZIP descargado no contenía
- * el PDF pedido — en ese caso ya se mostró un {@code toast.warning} desde
- * acá y el caller debería evitar mostrar un toast de éxito contradictorio.
- *
- * <p><b>Errores</b>: los errores HTTP los muestra el interceptor axios
- * global; acá los re-lanzamos para que el caller maneje su propio loading
- * state via try/catch.
+ * <p>El caller pasa el fetcher correcto según el contexto (DISTRIBUIDOR o
+ * ADMIN). Los errores HTTP los maneja el interceptor axios global; acá los
+ * re-lanzamos para que el caller pueda hacer su propio try/catch del loading
+ * state.
  */
-export async function descargarArchivoProceso(
+export async function descargarPdfProceso(
     procesoId: string,
     tipo: DescargaTipo,
-    fetchBlob: (procesoId: string) => Promise<Blob>
-): Promise<boolean> {
+    fetchBlob: (procesoId: string) => Promise<Blob>,
+): Promise<void> {
     const blob = await fetchBlob(procesoId);
     const idCorto = procesoId.slice(0, 8);
-
-    if (tipo === "zip") {
-        saveAs(blob, `distribucion-${idCorto}.zip`);
-        return true;
-    }
-
-    const { etiquetas, resumen } = await extractPdfsFromZip(blob);
-    if (tipo === "etiquetas") {
-        if (!etiquetas) {
-            toast.warning("No hay PDF de etiquetas en este proceso.");
-            return false;
-        }
-        saveAs(etiquetas, `etiquetas-${idCorto}.pdf`);
-        return true;
-    }
-
-    // tipo === "resumen"
-    if (!resumen) {
-        toast.warning("No hay PDF de resumen en este proceso.");
-        return false;
-    }
-    saveAs(resumen, `resumen-${idCorto}.pdf`);
-    return true;
+    const prefijo = tipo === "etiquetas" ? "etiquetas" : "resumen";
+    saveAs(blob, `${prefijo}-${idCorto}.pdf`);
 }
