@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import Keycloak from "next-auth/providers/keycloak";
 import type { JWT } from "next-auth/jwt";
 
+
 /**
  * Auth.js (NextAuth v5) — Keycloak OIDC via Authorization Code + PKCE (BFF).
  *
@@ -221,23 +222,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       session.roles = token.roles ?? [];
       return session;
     },
-    /**
-     * Llamado por el middleware de Next en CADA request matcheado (ver
-     * `middleware.ts`). Si devuelve `false`, NextAuth redirige a la
-     * página de signIn. Sin este callback, el middleware solo adjuntaba la
-     * sesión pero no protegía rutas — sólo las páginas que hacían fetch a
-     * la API y caían en 401 disparaban el re-login vía axios interceptor.
-     *
-     * Acá filtramos por sesión válida (con accessToken + sin error de
-     * refresh). Si querés páginas públicas, agregar excepciones por
-     * `pathname` antes del check final.
-     */
-    authorized({ auth: session, request }) {
-      // Acceso público al endpoint de health/manifest si existieran:
-      // const path = request.nextUrl.pathname;
-      // if (path === "/manifest.json") return true;
-      void request;
-      return Boolean(session?.accessToken) && session?.error !== "RefreshAccessTokenError";
-    },
+    // No usamos el callback `authorized` (suele ignorarse en v5 beta cuando
+    // hay redirects); la protección vive en `middleware.ts` con el patrón
+    // explícito `auth((req) => ...)` que SÍ respeta el NextResponse que se
+    // retorna. Ver `lib/auth-middleware.evaluarAcceso`.
   },
 });

@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { saveAs } from "file-saver";
-import { ArrowLeft, Check, Download, FileUp, RefreshCw, Route } from "lucide-react";
+import { Check, Download, FileUp, RefreshCw, Route } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/PageHeader";
 import { PageShell } from "@/components/PageShell";
 import { RutaUploadStep } from "@/components/ruta/RutaUploadStep";
 import { RutaFechasStep } from "@/components/ruta/RutaFechasStep";
@@ -72,34 +72,19 @@ export default function RutaPage() {
     return (
         <PageShell>
             <main className="container mx-auto px-4 py-10 max-w-6xl">
-                <div className="mb-8">
-                    <Link
-                        href="/"
-                        className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-3 transition-colors"
-                    >
-                        <ArrowLeft className="h-3 w-3 mr-1" />
-                        Volver al inicio
-                    </Link>
-                    <div className="flex items-start justify-between gap-4">
-                        <div>
-                            <div className="flex items-center gap-3 mb-2">
-                                <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
-                                    <Route className="h-5 w-5 text-primary" />
-                                </div>
-                                <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Recorrido de ruta</h1>
-                            </div>
-                            <p className="text-muted-foreground">
-                                Subí el Excel → elegí las fechas → completá los registros y descargá el Excel actualizado.
-                            </p>
-                        </div>
-                        {step !== "carga" && (
+                <PageHeader
+                    title="Recorrido de ruta"
+                    description="Subí el Excel → elegí las fechas → completá los registros y descargá el Excel actualizado."
+                    icon={Route}
+                    actions={
+                        step !== "carga" && (
                             <Button variant="outline" size="sm" onClick={reiniciar}>
                                 <RefreshCw className="h-4 w-4 mr-2" />
                                 Empezar de nuevo
                             </Button>
-                        )}
-                    </div>
-                </div>
+                        )
+                    }
+                />
 
                 <StepIndicator current={step} />
 

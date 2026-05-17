@@ -21,11 +21,12 @@ describe("normalizarEstado", () => {
 });
 
 describe("ESTADO_PROCESO_COLOR", () => {
-    it("tiene las 3 keys que el backend emite", () => {
+    it("tiene las 4 keys que el backend emite", () => {
         // Mantenido sincronizado con el EstadoEnum del backend.
         expect(ESTADO_PROCESO_COLOR.PENDIENTE).toBeTruthy();
         expect(ESTADO_PROCESO_COLOR.SIMULADO).toBeTruthy();
         expect(ESTADO_PROCESO_COLOR.COMPLETADO).toBeTruthy();
+        expect(ESTADO_PROCESO_COLOR.ABANDONADO).toBeTruthy();
     });
 
     it("fallback no es undefined", () => {

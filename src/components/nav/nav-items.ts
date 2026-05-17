@@ -7,13 +7,11 @@ import {
     ListChecks,
     Printer,
     Route,
-    Settings,
     ShieldCheck,
     Users2,
     type LucideIcon,
 } from "lucide-react";
 import {
-    FLAG_PAGE_CONFIGURACION,
     FLAG_PAGE_MIS_DISTRIBUCIONES,
     FLAG_PAGE_RUTA,
     FLAG_PAGE_UPLOAD,
@@ -69,14 +67,9 @@ export const NAV_GROUPS: NavGroup[] = [
                 icon: ListChecks,
                 flag: FLAG_PAGE_MIS_DISTRIBUCIONES,
             },
-            {
-                href: "/configuracion",
-                title: "Configuración",
-                description: "Ajustes del simulador de distribución.",
-                icon: Settings,
-                requiresProceso: true,
-                flag: FLAG_PAGE_CONFIGURACION,
-            },
+            // /configuracion intencionalmente NO está acá: es paso interno
+            // del wizard (upload → configuracion → resultados), accesible
+            // sólo via router.push del flujo. El page sigue funcionando.
             {
                 href: "/preferencias-etiquetas",
                 title: "Preferencias de etiquetas",

@@ -15,17 +15,21 @@ interface SidebarProps {
 
 export function Sidebar({ onNavigate }: SidebarProps) {
     const pathname = usePathname();
-    const { esAdmin } = useUserPermissions();
+    const { esAdmin, displayName, autenticado } = useUserPermissions();
     const { isEnabled } = useFeatureFlags();
     const procesoId = useProcesoStore((s) => s.procesoId);
     const hayProceso = typeof procesoId === "string" && procesoId.length > 0;
 
+    const inicial =
+        displayName?.trim().charAt(0).toUpperCase() ?? "?";
+
     return (
         <nav
-            className="flex h-full flex-col gap-1 overflow-y-auto bg-sidebar text-sidebar-foreground"
+            className="flex h-full flex-col bg-sidebar text-sidebar-foreground"
             aria-label="Navegación principal"
         >
-            <div className="px-4 pt-5 pb-4">
+            {/* Header: el logo queda fijo en el top (no scrollea). */}
+            <div className="shrink-0 px-4 pt-5 pb-4">
                 <Link
                     href="/"
                     onClick={onNavigate}
@@ -41,7 +45,10 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                 </Link>
             </div>
 
-            <div className="flex flex-1 flex-col gap-5 px-3 pb-4">
+            {/* Contenido scrolleable: solo este div se desplaza cuando los
+                items superan el alto disponible. El logo (top) y el bloque
+                del usuario (bottom) quedan anclados por el flex layout. */}
+            <div className="flex flex-1 min-h-0 flex-col gap-5 overflow-y-auto px-3 pb-4">
                 {NAV_GROUPS.filter((g) => !g.admin || esAdmin)
                     .map((group) => ({
                         ...group,
@@ -93,9 +100,21 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                 ))}
             </div>
 
-            <div className="border-t border-sidebar-border px-4 py-3 text-[11px] text-muted-foreground">
-                v0.1 · build interna
-            </div>
+            {autenticado && (
+                <div className="shrink-0 border-t border-sidebar-border px-3 py-3 bg-sidebar">
+                    <div className="flex items-center gap-2.5 px-1.5">
+                        <span
+                            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold"
+                            aria-hidden="true"
+                        >
+                            {inicial}
+                        </span>
+                        <span className="truncate text-xs text-muted-foreground">
+                            {displayName ?? "Usuario"}
+                        </span>
+                    </div>
+                </div>
+            )}
         </nav>
     );
 }

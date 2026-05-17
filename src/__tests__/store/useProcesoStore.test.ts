@@ -1,6 +1,13 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useProcesoStore } from "@/store/useProcesoStore";
+import * as api from "@/lib/api";
 import type { VendedorResponseDTO, VendedorSimuladoDTO } from "@/types";
+
+// El store llama abandonarProceso() fire-and-forget desde reset() cuando hay
+// un procesoId activo no completado. Lo mockeamos para no pegarle a axios.
+vi.mock("@/lib/api", () => ({
+    abandonarProceso: vi.fn().mockResolvedValue(undefined),
+}));
 
 /**
  * Tests del store de wizard. Aislamiento entre tests:
@@ -12,6 +19,7 @@ import type { VendedorResponseDTO, VendedorSimuladoDTO } from "@/types";
 beforeEach(() => {
     localStorage.clear();
     useProcesoStore.getState().reset();
+    vi.mocked(api.abandonarProceso).mockClear();
 });
 
 describe("useProcesoStore — estado inicial", () => {
@@ -99,6 +107,36 @@ describe("useProcesoStore — resetConfig vs reset", () => {
         expect(s.procesoId).toBeNull();
         expect(s.currentStep).toBe(1);
         expect(s.procesoCompletado).toBe(false);
+    });
+});
+
+describe("useProcesoStore — reset dispara abandonarProceso", () => {
+    it("avisa al backend si hay procesoId y NO está completado", () => {
+        useProcesoStore.getState().setProcesoId("p-ab");
+        vi.mocked(api.abandonarProceso).mockClear();
+        useProcesoStore.getState().reset();
+        expect(api.abandonarProceso).toHaveBeenCalledWith("p-ab");
+    });
+
+    it("no llama al backend si el proceso ya está completado", () => {
+        useProcesoStore.getState().setProcesoId("p-done");
+        useProcesoStore.getState().marcarProcesoCompletado();
+        vi.mocked(api.abandonarProceso).mockClear();
+        useProcesoStore.getState().reset();
+        expect(api.abandonarProceso).not.toHaveBeenCalled();
+    });
+
+    it("no llama al backend si no hay procesoId", () => {
+        vi.mocked(api.abandonarProceso).mockClear();
+        useProcesoStore.getState().reset();
+        expect(api.abandonarProceso).not.toHaveBeenCalled();
+    });
+
+    it("ignora errores del backend sin romper el reset local", () => {
+        useProcesoStore.getState().setProcesoId("p-fail");
+        vi.mocked(api.abandonarProceso).mockRejectedValueOnce(new Error("422"));
+        expect(() => useProcesoStore.getState().reset()).not.toThrow();
+        expect(useProcesoStore.getState().procesoId).toBeNull();
     });
 });
 

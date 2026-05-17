@@ -120,11 +120,17 @@ export default function UploadPage() {
 
                 <main className="container mx-auto px-4 py-10 max-w-5xl">
                     <Card className="border-0 shadow-xl bg-card/80 backdrop-blur-sm">
-                        <CardHeader className="text-center pb-2">
-                            <CardTitle className="text-2xl md:text-3xl font-bold">
-                                Carga de datos
+                        <CardHeader className="pb-2 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                            <div className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground mb-3">
+                                <span className="inline-block w-8 h-px bg-foreground/30"></span>
+                                Paso 1 — Carga
+                            </div>
+                            <CardTitle className="font-bold tracking-tight leading-[1.05] text-[clamp(1.5rem,3vw,2.5rem)]">
+                                <span className="bg-clip-text text-transparent bg-gradient-to-br from-foreground via-foreground to-foreground/55">
+                                    Carga de datos
+                                </span>
                             </CardTitle>
-                            <CardDescription className="text-base">
+                            <CardDescription className="text-base mt-2 max-w-xl">
                                 Subí tu archivo Excel con la información de los vendedores para comenzar.
                             </CardDescription>
                         </CardHeader>

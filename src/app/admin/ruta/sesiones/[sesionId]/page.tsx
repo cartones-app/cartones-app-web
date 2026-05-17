@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Check, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, LayoutGrid, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/PageHeader";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -83,32 +84,30 @@ export default function AdminSesionRutaDetailPage() {
 
     return (
         <main className="container mx-auto px-4 py-8 max-w-7xl">
-            <div className="mb-6">
-                <Link
-                    href="/admin/ruta/sesiones"
-                    className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-2"
-                >
-                    <ArrowLeft className="h-3 w-3 mr-1" />
-                    Volver al listado
-                </Link>
-                <div className="flex items-center justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl font-semibold">Detalle de sesión</h1>
-                        {sesion && (
-                            <p className="text-sm text-muted-foreground mt-1">
-                                <span className="font-mono">{shortId(sesion.sesionId)}</span> ·
-                                creada {formatFechaHora(sesion.createdAt)} por {sesion.createdBy || "—"} ·
-                                estado <strong>{sesion.estado}</strong> ·
-                                {sesion.registrosCompletados ?? 0}/{sesion.totalRegistros ?? 0} completos
-                            </p>
-                        )}
-                    </div>
+            <Link
+                href="/admin/ruta/sesiones"
+                className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors"
+            >
+                <ArrowLeft className="h-3 w-3 mr-1" />
+                Volver al listado
+            </Link>
+            <PageHeader
+                title="Detalle de sesión"
+                description={
+                    sesion
+                        ? `${shortId(sesion.sesionId)} · creada ${formatFechaHora(sesion.createdAt)} por ${sesion.createdBy || "—"} · estado ${sesion.estado} · ${sesion.registrosCompletados ?? 0}/${sesion.totalRegistros ?? 0} completos`
+                        : undefined
+                }
+                icon={LayoutGrid}
+                admin
+                actions={
                     <Button variant="outline" size="sm" onClick={cargar} disabled={cargando}>
                         <RefreshCw className={`h-4 w-4 ${cargando ? "animate-spin" : ""}`} />
                         <span className="ml-2 hidden sm:inline">Recargar</span>
                     </Button>
-                </div>
-            </div>
+                }
+            />
+
 
             <form
                 className="flex flex-wrap items-end gap-3 mb-4 p-4 rounded-lg border bg-card"
