@@ -37,7 +37,7 @@ describe("requireSesion", () => {
 
         const { requireSesion } = await import("@/lib/auth-guard");
         await expect(requireSesion("/upload")).rejects.toThrow(
-            "__REDIRECT__:/api/auth/signin/keycloak?callbackUrl=%2Fupload",
+            "__REDIRECT__:/api/auth/signin?callbackUrl=%2Fupload",
         );
     });
 
@@ -52,7 +52,7 @@ describe("requireSesion", () => {
 
         const { requireSesion } = await import("@/lib/auth-guard");
         await expect(requireSesion("/admin/distribuciones")).rejects.toThrow(
-            /__REDIRECT__:\/api\/auth\/signin\/keycloak\?callbackUrl=/,
+            /__REDIRECT__:\/api\/auth\/signin\?callbackUrl=/,
         );
     });
 
@@ -64,7 +64,7 @@ describe("requireSesion", () => {
         const { requireSesion } = await import("@/lib/auth-guard");
         await expect(requireSesion("/admin/distribuciones?page=2")).rejects.toThrow(
             // URLSearchParams encodea el `?` y el `=` del query interno.
-            "__REDIRECT__:/api/auth/signin/keycloak?callbackUrl=%2Fadmin%2Fdistribuciones%3Fpage%3D2",
+            "__REDIRECT__:/api/auth/signin?callbackUrl=%2Fadmin%2Fdistribuciones%3Fpage%3D2",
         );
     });
 });

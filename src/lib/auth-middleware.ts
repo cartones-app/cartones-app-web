@@ -3,11 +3,19 @@ import type { NextRequest } from "next/server";
 import type { Session } from "next-auth";
 
 /**
- * Endpoint que dispara el flujo de login con Keycloak (auto-trigger sin la
- * pantalla intermedia de NextAuth). Centralizado para que el middleware y
- * cualquier redirect manual usen el mismo path.
+ * Página de signin a la que mandamos al usuario cuando no hay sesión válida.
+ *
+ * Apunta a la página built-in de NextAuth (`/api/auth/signin`), NO al
+ * endpoint del provider (`/api/auth/signin/keycloak`). En NextAuth v5 beta
+ * el endpoint del provider requiere POST con CSRF token — si lo invocamos
+ * con GET (como hace un redirect del middleware/layout) NextAuth devuelve
+ * `error=Configuration`. La página built-in maneja la generación del CSRF
+ * y dispara el provider con un click.
+ *
+ * Si en el futuro querés zero-click al provider, hay que armar una page
+ * propia (ej. `/login`) que use `signIn("keycloak")` al mount.
  */
-export const KEYCLOAK_SIGNIN_PATH = "/api/auth/signin/keycloak";
+export const KEYCLOAK_SIGNIN_PATH = "/api/auth/signin";
 
 /**
  * Rutas accesibles sin sesión. La home `/` actúa como landing/anónimo:

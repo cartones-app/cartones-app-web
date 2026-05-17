@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import Keycloak from "next-auth/providers/keycloak";
 import type { JWT } from "next-auth/jwt";
 
-import { KEYCLOAK_SIGNIN_PATH, evaluarAcceso } from "@/lib/auth-middleware";
+import { evaluarAcceso } from "@/lib/auth-middleware";
 
 /**
  * Auth.js (NextAuth v5) — Keycloak OIDC via Authorization Code + PKCE (BFF).
@@ -194,13 +194,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   session: { strategy: "jwt" },
-  pages: {
-    // Cuando NextAuth necesita mostrar el signIn (por ejemplo desde un Link
-    // a `/api/auth/signin`), salteamos su página intermedia y vamos directo
-    // al provider Keycloak — el flujo es 1-click más rápido. El middleware
-    // también apunta acá vía `evaluarAcceso`.
-    signIn: KEYCLOAK_SIGNIN_PATH,
-  },
   callbacks: {
     async jwt({ token, account }) {
       // 1) Primer login: persistir los tokens del provider en el JWT de sesión.
