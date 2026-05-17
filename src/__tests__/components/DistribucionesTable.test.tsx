@@ -88,6 +88,16 @@ describe("DistribucionesTable", () => {
         expect(spyUser).not.toHaveBeenCalled();
     });
 
+    it("renderiza el badge para estado ABANDONADO", () => {
+        const p = row({
+            estado: "ABANDONADO",
+            archivosGeneradosEn: null,
+            archivosBorradosEn: null,
+        });
+        render(<DistribucionesTable procesos={[p]} />);
+        expect(screen.getByText("ABANDONADO")).toBeInTheDocument();
+    });
+
     it("no muestra ningún botón de ZIP (eliminado del flujo)", () => {
         render(<DistribucionesTable procesos={[row()]} />);
         expect(screen.queryByText(/zip/i)).not.toBeInTheDocument();

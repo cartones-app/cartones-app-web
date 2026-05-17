@@ -84,6 +84,17 @@ export const generarArchivosProceso = async (
 };
 
 /**
+ * Marca el proceso como ABANDONADO. Fire-and-forget desde el front cuando el
+ * usuario descarta el proceso vía "reiniciar sesión". El endpoint es
+ * idempotente y devuelve 204; si el proceso ya estaba completado el backend
+ * responde 422 y el caller lo ignora — no necesitamos limpiar algo terminado.
+ * POST /api/distribuciones/{procesoId}/abandonar
+ */
+export const abandonarProceso = async (procesoId: string): Promise<void> => {
+    await api.post(`/api/distribuciones/${encodeURIComponent(procesoId)}/abandonar`);
+};
+
+/**
  * Descarga el PDF de etiquetas (vista DISTRIBUIDOR, ownership-checked).
  * GET /api/distribuciones/{procesoId}/etiquetas.pdf
  */

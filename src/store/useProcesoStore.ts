@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { abandonarProceso } from '@/lib/api';
 import {
     PoolRangeForm,
     VendedorInputDTO,
@@ -113,7 +114,18 @@ export const useProcesoStore = create<ProcesoState>()(
 
             resetConfig: () => set({ config: emptyConfig }),
 
-            reset: () => set(initialState),
+            reset: () => {
+                // Si hay un proceso en curso que no se completó, avisamos al
+                // backend para que lo marque como ABANDONADO y deje de aparecer
+                // como SIMULADO huérfano. Fire-and-forget: si el backend está
+                // caído o devuelve 422 (proceso ya completado), no rompemos el
+                // flow del usuario — el reset local sigue adelante.
+                const { procesoId, procesoCompletado } = get();
+                if (procesoId && !procesoCompletado) {
+                    abandonarProceso(procesoId).catch(() => {});
+                }
+                set(initialState);
+            },
         }),
         {
             name: 'proceso-storage',
