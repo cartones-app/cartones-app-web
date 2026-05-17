@@ -2,6 +2,8 @@ import NextAuth from "next-auth";
 import Keycloak from "next-auth/providers/keycloak";
 import type { JWT } from "next-auth/jwt";
 
+import { KEYCLOAK_SIGNIN_PATH, evaluarAcceso } from "@/lib/auth-middleware";
+
 /**
  * Auth.js (NextAuth v5) — Keycloak OIDC via Authorization Code + PKCE (BFF).
  *
@@ -192,6 +194,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   session: { strategy: "jwt" },
+  pages: {
+    // Cuando NextAuth necesita mostrar el signIn (por ejemplo desde un Link
+    // a `/api/auth/signin`), salteamos su página intermedia y vamos directo
+    // al provider Keycloak — el flujo es 1-click más rápido. El middleware
+    // también apunta acá vía `evaluarAcceso`.
+    signIn: KEYCLOAK_SIGNIN_PATH,
+  },
   callbacks: {
     async jwt({ token, account }) {
       // 1) Primer login: persistir los tokens del provider en el JWT de sesión.
@@ -223,21 +232,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
     /**
      * Llamado por el middleware de Next en CADA request matcheado (ver
-     * `middleware.ts`). Si devuelve `false`, NextAuth redirige a la
-     * página de signIn. Sin este callback, el middleware solo adjuntaba la
-     * sesión pero no protegía rutas — sólo las páginas que hacían fetch a
-     * la API y caían en 401 disparaban el re-login vía axios interceptor.
+     * `middleware.ts`). La lógica vive en `evaluarAcceso` (función pura,
+     * testeable). El callback solo conecta NextAuth → función pura.
      *
-     * Acá filtramos por sesión válida (con accessToken + sin error de
-     * refresh). Si querés páginas públicas, agregar excepciones por
-     * `pathname` antes del check final.
+     * Si querés páginas públicas, agregalas en `evaluarAcceso` con un
+     * check de `request.nextUrl.pathname` antes del check de sesión.
      */
     authorized({ auth: session, request }) {
-      // Acceso público al endpoint de health/manifest si existieran:
-      // const path = request.nextUrl.pathname;
-      // if (path === "/manifest.json") return true;
-      void request;
-      return Boolean(session?.accessToken) && session?.error !== "RefreshAccessTokenError";
+      return evaluarAcceso(session, request);
     },
   },
 });
