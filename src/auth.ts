@@ -2,7 +2,6 @@ import NextAuth from "next-auth";
 import Keycloak from "next-auth/providers/keycloak";
 import type { JWT } from "next-auth/jwt";
 
-import { evaluarAcceso } from "@/lib/auth-middleware";
 
 /**
  * Auth.js (NextAuth v5) — Keycloak OIDC via Authorization Code + PKCE (BFF).
@@ -223,16 +222,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       session.roles = token.roles ?? [];
       return session;
     },
-    /**
-     * Llamado por el middleware de Next en CADA request matcheado (ver
-     * `middleware.ts`). La lógica vive en `evaluarAcceso` (función pura,
-     * testeable). El callback solo conecta NextAuth → función pura.
-     *
-     * Si querés páginas públicas, agregalas en `evaluarAcceso` con un
-     * check de `request.nextUrl.pathname` antes del check de sesión.
-     */
-    authorized({ auth: session, request }) {
-      return evaluarAcceso(session, request);
-    },
+    // No usamos el callback `authorized` (suele ignorarse en v5 beta cuando
+    // hay redirects); la protección vive en `middleware.ts` con el patrón
+    // explícito `auth((req) => ...)` que SÍ respeta el NextResponse que se
+    // retorna. Ver `lib/auth-middleware.evaluarAcceso`.
   },
 });
