@@ -1,6 +1,7 @@
 import {
     FileSpreadsheet,
     Flag,
+    HardDrive,
     LayoutDashboard,
     LayoutGrid,
     ListChecks,
@@ -123,6 +124,12 @@ export const NAV_GROUPS: NavGroup[] = [
                 title: "Preferencias de etiquetas",
                 description: "Ajustar diseño y orden de etiquetas por distribuidor.",
                 icon: Printer,
+            },
+            {
+                href: "/admin/configuracion-archivos",
+                title: "Retención de archivos",
+                description: "Tiempo de conservación y borrado automático de PDFs.",
+                icon: HardDrive,
             },
             {
                 href: "/admin/feature-flags",
