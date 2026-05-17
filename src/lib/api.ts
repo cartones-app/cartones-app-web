@@ -1,7 +1,10 @@
 import api from './axios';
 import {
+    ActualizarConfiguracionArchivosRequest,
     ActualizarPreferenciasRequest,
+    ArchivosGeneradosDTO,
     CargaRutaResponseDTO,
+    ConfiguracionArchivosDTO,
     EliminarSesionesRequestDTO,
     ExclusionRutaRequestDTO,
     ExclusionRutaResponseDTO,
@@ -67,11 +70,36 @@ export const simularDistribucion = async (
 };
 
 /**
- * Download ZIP file containing PDFs
- * GET /api/distribuciones/{procesoId}/pdfs
+ * Genera los PDFs de un proceso SIMULADO: los escribe al filesystem en el
+ * backend, transiciona el estado a COMPLETADO y devuelve los timestamps.
+ * POST /api/distribuciones/{procesoId}/archivos
  */
-export const downloadPdfs = async (procesoId: string): Promise<Blob> => {
-    const response = await api.get(`/api/distribuciones/${procesoId}/pdfs`, {
+export const generarArchivosProceso = async (
+    procesoId: string,
+): Promise<ArchivosGeneradosDTO> => {
+    const response = await api.post<ArchivosGeneradosDTO>(
+        `/api/distribuciones/${procesoId}/archivos`,
+    );
+    return response.data;
+};
+
+/**
+ * Descarga el PDF de etiquetas (vista DISTRIBUIDOR, ownership-checked).
+ * GET /api/distribuciones/{procesoId}/etiquetas.pdf
+ */
+export const descargarEtiquetas = async (procesoId: string): Promise<Blob> => {
+    const response = await api.get(`/api/distribuciones/${procesoId}/etiquetas.pdf`, {
+        responseType: 'blob',
+    });
+    return response.data;
+};
+
+/**
+ * Descarga el PDF de resumen (vista DISTRIBUIDOR, ownership-checked).
+ * GET /api/distribuciones/{procesoId}/resumen.pdf
+ */
+export const descargarResumen = async (procesoId: string): Promise<Blob> => {
+    const response = await api.get(`/api/distribuciones/${procesoId}/resumen.pdf`, {
         responseType: 'blob',
     });
     return response.data;
@@ -96,14 +124,38 @@ export const listarTodasLasDistribuciones = async (): Promise<ProcesoDistribucio
     return response.data;
 };
 
-/**
- * Descarga el ZIP del proceso (vista admin, sin restricción de ownership).
- * GET /api/admin/distribuciones/{procesoId}/pdfs
- */
-export const downloadPdfsAdmin = async (procesoId: string): Promise<Blob> => {
-    const response = await api.get(`/api/admin/distribuciones/${procesoId}/pdfs`, {
+/** Versión admin de descargarEtiquetas — sin restricción de ownership. */
+export const descargarEtiquetasAdmin = async (procesoId: string): Promise<Blob> => {
+    const response = await api.get(`/api/admin/distribuciones/${procesoId}/etiquetas.pdf`, {
         responseType: 'blob',
     });
+    return response.data;
+};
+
+/** Versión admin de descargarResumen — sin restricción de ownership. */
+export const descargarResumenAdmin = async (procesoId: string): Promise<Blob> => {
+    const response = await api.get(`/api/admin/distribuciones/${procesoId}/resumen.pdf`, {
+        responseType: 'blob',
+    });
+    return response.data;
+};
+
+// --- Configuración de archivos (admin) ------------------------------------
+
+/** GET /api/admin/configuracion-archivos */
+export const obtenerConfiguracionArchivos = async (): Promise<ConfiguracionArchivosDTO> => {
+    const response = await api.get<ConfiguracionArchivosDTO>('/api/admin/configuracion-archivos');
+    return response.data;
+};
+
+/** PUT /api/admin/configuracion-archivos */
+export const actualizarConfiguracionArchivos = async (
+    body: ActualizarConfiguracionArchivosRequest,
+): Promise<ConfiguracionArchivosDTO> => {
+    const response = await api.put<ConfiguracionArchivosDTO>(
+        '/api/admin/configuracion-archivos',
+        body,
+    );
     return response.data;
 };
 

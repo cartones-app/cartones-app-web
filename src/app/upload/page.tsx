@@ -4,11 +4,16 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowRight, ChevronRight, Clock, FileArchive, FileText, Loader2, RotateCcw, Tag } from "lucide-react";
+import { ArrowRight, ChevronRight, Clock, FileText, Loader2, RotateCcw, Tag } from "lucide-react";
 import { FileUploader } from "@/components/FileUploader";
 import { WizardStepper } from "@/components/WizardStepper";
 import { useProcesoStore } from "@/store/useProcesoStore";
-import { downloadPdfs, listarMisDistribuciones, uploadExcel } from "@/lib/api";
+import {
+    descargarEtiquetas,
+    descargarResumen,
+    listarMisDistribuciones,
+    uploadExcel,
+} from "@/lib/api";
 import { formatFechaHoraCorta } from "@/lib/date-format";
 import { shortId } from "@/lib/format-id";
 import {
@@ -16,11 +21,11 @@ import {
     ESTADO_PROCESO_COLOR_FALLBACK,
     normalizarEstado,
 } from "@/lib/proceso-estado";
-import { descargarArchivoProceso, type DescargaTipo } from "@/lib/proceso-descarga";
+import { descargarPdfProceso, type DescargaTipo } from "@/lib/proceso-descarga";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { ProcesoDistribucionResumenDTO } from "@/types";
+import { archivosDisponibles, type ProcesoDistribucionResumenDTO } from "@/types";
 
 const RECIENTES_LIMIT = 4;
 
@@ -88,7 +93,8 @@ export default function UploadPage() {
     const handleDescargar = async (procesoId: string, tipo: DescargaTipo) => {
         setDescargando({ id: procesoId, tipo });
         try {
-            await descargarArchivoProceso(procesoId, tipo, downloadPdfs);
+            const fetcher = tipo === "etiquetas" ? descargarEtiquetas : descargarResumen;
+            await descargarPdfProceso(procesoId, tipo, fetcher);
         } catch {
             // toast global
         } finally {
@@ -223,7 +229,7 @@ export default function UploadPage() {
                         ) : (
                             <div className="grid sm:grid-cols-2 gap-3">
                                 {recientes.map((p) => {
-                                    const puedeDescargar = p.tieneEtiquetas || p.tieneResumen;
+                                    const disponibles = archivosDisponibles(p);
                                     return (
                                         <div
                                             key={p.procesoId}
@@ -249,6 +255,13 @@ export default function UploadPage() {
                                                             </span>
                                                         );
                                                     })()}
+                                                    {!disponibles && (
+                                                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                                            {p.archivosBorradosEn !== null
+                                                                ? "No disponibles"
+                                                                : "Sin generar"}
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 <div className="text-xs text-muted-foreground mt-0.5">
                                                     {formatFechaHoraCorta(p.createdAt)}
@@ -258,9 +271,13 @@ export default function UploadPage() {
                                                 <Button
                                                     size="sm"
                                                     variant="ghost"
-                                                    disabled={!p.tieneEtiquetas || isBusy(p.procesoId, "etiquetas")}
+                                                    disabled={!disponibles || isBusy(p.procesoId, "etiquetas")}
                                                     onClick={() => handleDescargar(p.procesoId, "etiquetas")}
-                                                    title="Descargar solo etiquetas (PDF)"
+                                                    title={
+                                                        disponibles
+                                                            ? "Descargar etiquetas (PDF)"
+                                                            : "Archivos no disponibles"
+                                                    }
                                                     aria-label="Descargar etiquetas"
                                                 >
                                                     {isBusy(p.procesoId, "etiquetas") ? (
@@ -272,29 +289,19 @@ export default function UploadPage() {
                                                 <Button
                                                     size="sm"
                                                     variant="ghost"
-                                                    disabled={!p.tieneResumen || isBusy(p.procesoId, "resumen")}
+                                                    disabled={!disponibles || isBusy(p.procesoId, "resumen")}
                                                     onClick={() => handleDescargar(p.procesoId, "resumen")}
-                                                    title="Descargar solo resumen (PDF)"
+                                                    title={
+                                                        disponibles
+                                                            ? "Descargar resumen (PDF)"
+                                                            : "Archivos no disponibles"
+                                                    }
                                                     aria-label="Descargar resumen"
                                                 >
                                                     {isBusy(p.procesoId, "resumen") ? (
                                                         <Loader2 className="h-4 w-4 animate-spin" />
                                                     ) : (
                                                         <FileText className="h-4 w-4" />
-                                                    )}
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    disabled={!puedeDescargar || isBusy(p.procesoId, "zip")}
-                                                    onClick={() => handleDescargar(p.procesoId, "zip")}
-                                                    title="Descargar ZIP completo"
-                                                    aria-label="Descargar ZIP"
-                                                >
-                                                    {isBusy(p.procesoId, "zip") ? (
-                                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                                    ) : (
-                                                        <FileArchive className="h-4 w-4" />
                                                     )}
                                                 </Button>
                                             </div>
