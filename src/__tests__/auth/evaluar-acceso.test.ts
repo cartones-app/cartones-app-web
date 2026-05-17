@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { Session } from "next-auth";
 import type { NextRequest } from "next/server";
 
-import { KEYCLOAK_SIGNIN_PATH, evaluarAcceso } from "@/lib/auth-middleware";
+import {
+    KEYCLOAK_SIGNIN_PATH,
+    evaluarAcceso,
+    requiereSesion,
+} from "@/lib/auth-middleware";
 
 /**
  * Construye un mínimo `NextRequest` con `nextUrl` que basta para `evaluarAcceso`.
@@ -38,13 +42,12 @@ describe("evaluarAcceso", () => {
         expect(location.searchParams.get("callbackUrl")).toBe("/configuracion");
     });
 
-    it("sin sesión en la home → redirect con callbackUrl='/'", () => {
-        // La home también requiere sesión: con `auth as middleware` no se debe
-        // poder navegar a `/` sin login (este caso era el bug reportado).
+    it("la home `/` es pública y pasa sin sesión", () => {
+        // La home es landing/anónima — muestra "Gestión de cartones" como
+        // texto genérico cuando no hay sesión, y saludo personalizado cuando
+        // sí. Negarle el acceso anónimo rompería ese contrato.
         const result = evaluarAcceso(null, mockRequest("/"));
-        expect(result).not.toBe(true);
-        const location = new URL((result as Response).headers.get("location")!);
-        expect(location.searchParams.get("callbackUrl")).toBe("/");
+        expect(result).toBe(true);
     });
 
     it("preserva query strings en callbackUrl", () => {
@@ -72,16 +75,27 @@ describe("evaluarAcceso", () => {
         expect((result as Response).status).toBe(307);
     });
 
-    it("con session vacía (sin accessToken) → redirect", () => {
+    it("con session vacía (sin accessToken) en ruta protegida → redirect", () => {
         // Caso del bug: session existe pero sin accessToken. La versión anterior
         // del callback retornaba `false` y NextAuth v5 beta no redirigía con
         // confiabilidad → la página quedaba accesible.
         const result = evaluarAcceso(
             { expires: new Date(Date.now() + 60_000).toISOString() } as Session,
-            mockRequest("/"),
+            mockRequest("/upload"),
         );
         expect(result).not.toBe(true);
         expect((result as Response).status).toBe(307);
+    });
+
+    it("la home `/` es pública incluso con sesión rota (no redirige)", () => {
+        // Si por algún motivo se accede a `/` con sesión inválida, el
+        // middleware igual deja pasar — la home se las arregla mostrando el
+        // texto anónimo. No tiene sentido forzar login para una landing.
+        const result = evaluarAcceso(
+            { expires: new Date(Date.now() + 60_000).toISOString() } as Session,
+            mockRequest("/"),
+        );
+        expect(result).toBe(true);
     });
 
     it("el redirect apunta al origin de la request (no a un host hardcoded)", () => {
@@ -95,5 +109,25 @@ describe("evaluarAcceso", () => {
         const result = evaluarAcceso(null, request);
         const location = new URL((result as Response).headers.get("location")!);
         expect(location.origin).toBe("https://staging.example.com");
+    });
+});
+
+describe("requiereSesion", () => {
+    it("`/` no requiere sesión (ruta pública)", () => {
+        expect(requiereSesion("/")).toBe(false);
+    });
+
+    it("cualquier subruta requiere sesión", () => {
+        expect(requiereSesion("/upload")).toBe(true);
+        expect(requiereSesion("/configuracion")).toBe(true);
+        expect(requiereSesion("/admin/distribuciones")).toBe(true);
+        expect(requiereSesion("/resultados")).toBe(true);
+    });
+
+    it("paths que solo empiezan con `/` pero no son la home siguen siendo protegidos", () => {
+        // Guard contra implementación que use startsWith en vez de igualdad
+        // exacta — si alguien escribe `/info` no debería pasar como público.
+        expect(requiereSesion("/info")).toBe(true);
+        expect(requiereSesion("//")).toBe(true);
     });
 });
