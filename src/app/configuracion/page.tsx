@@ -53,7 +53,13 @@ export default function ConfiguracionPage() {
     // Derivado del store: si hay resultados, ya simulamos. Evita race con la
     // hidratación async de zustand/persist en el primer render.
     const hasSimulated = resultados.length > 0;
-    const [showResultsPreview, setShowResultsPreview] = useState(resultados.length > 0);
+    // El user puede colapsar/expandir manualmente el preview, pero si el store
+    // se queda sin resultados (reset desde otra pestaña / sincronización), el
+    // preview no debería mostrarse "vacío con mensaje de error". Combinamos el
+    // toggle local con el length del store: visible solo cuando ambos lo
+    // permiten.
+    const [previewExpandido, setPreviewExpandido] = useState(true);
+    const showResultsPreview = previewExpandido && resultados.length > 0;
 
     // La config vive en el store — al volver desde /resultados los rangos /
     // terminaciones / fechas siguen ahí. Las fechas se transportan como Date
@@ -81,10 +87,18 @@ export default function ConfiguracionPage() {
             return;
         }
 
-        // Fetch vendedores
+        // Flag de cleanup para descartar la respuesta si el componente se
+        // desmonta (navegación a /upload, cambio de procesoId) o si el effect
+        // se re-dispara antes de que termine el fetch. Sin esto, una respuesta
+        // tardía de un procesoId viejo podría pisar `vendedores` del nuevo o
+        // re-inicializar `vendedorInputs` con datos del anterior tras un
+        // resetConfig() implícito.
+        let cancelado = false;
+
         const fetchVendedores = async () => {
             try {
                 const data = await getVendedores(procesoId);
+                if (cancelado) return;
                 setVendedores(data);
                 // Solo inicializar vendedorInputs si no hay nada en el store —
                 // si el usuario ya editó terminaciones y vuelve desde /resultados,
@@ -106,11 +120,15 @@ export default function ConfiguracionPage() {
             } catch {
                 // Error handled by axios interceptor
             } finally {
-                setIsLoading(false);
+                if (!cancelado) setIsLoading(false);
             }
         };
 
         fetchVendedores();
+
+        return () => {
+            cancelado = true;
+        };
     }, [procesoId, router, setVendedores, patchConfig]);
 
     const handleUpdateVendedor = (
@@ -156,7 +174,7 @@ export default function ConfiguracionPage() {
             setResultados(resultados);
             setCurrentStep(3);
             // hasSimulated se deriva de resultados.length, ya quedó implícito.
-            setShowResultsPreview(true);
+            setPreviewExpandido(true);
             toast.success("Simulación completada", {
                 description: "Revisa los resultados asignados en la tabla inferior.",
             });
@@ -204,7 +222,17 @@ export default function ConfiguracionPage() {
                         <span className="text-xs text-muted-foreground hidden sm:block">
                             Proceso: {shortId(procesoId)}
                         </span>
-                        <Button variant="ghost" size="sm" onClick={handleReset}>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleReset}
+                            // Durante isSimulating la request está en flight: si el user
+                            // resetea ahora, el `setResultados` del handler (que corre
+                            // cuando vuelve la respuesta) escribe sobre el store ya
+                            // limpio, dejando el wizard en un estado inconsistente
+                            // (procesoId=null + resultados con datos del proceso anterior).
+                            disabled={isSimulating}
+                        >
                             <RotateCcw className="h-4 w-4 mr-2" />
                             Reiniciar
                         </Button>
@@ -238,12 +266,12 @@ export default function ConfiguracionPage() {
                         onUpdateVendedor={handleUpdateVendedor}
                         resultados={resultados}
                         showResultsPreview={showResultsPreview}
-                        setShowResultsPreview={setShowResultsPreview}
+                        setShowResultsPreview={setPreviewExpandido}
                     />
 
                     {/* Action Buttons - Only Back button remains, others moved to sticky bar */}
                     <div className="pt-4">
-                        <Button variant="outline" onClick={handleBack}>
+                        <Button variant="outline" onClick={handleBack} disabled={isSimulating}>
                             <ArrowLeft className="h-4 w-4 mr-2" />
                             Volver
                         </Button>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { saveAs } from "file-saver";
 import { Check, Download, FileUp, RefreshCw, Route } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,17 +24,34 @@ export default function RutaPage() {
     const [fechasDisponibles, setFechasDisponibles] = useState<string[]>([]);
     const [registros, setRegistros] = useState<RegistroRutaDTO[]>([]);
     const [cargando, setCargando] = useState(false);
+    const [errorCarga, setErrorCarga] = useState(false);
+    const [errorExportar, setErrorExportar] = useState(false);
+    // Guardamos el último archivo para que el botón "Reintentar" del
+    // FileUploader pueda re-disparar el upload sin que el user tenga que
+    // tirar y volver a soltar el Excel.
+    const ultimoArchivoRef = useRef<File | null>(null);
 
     const handleUpload = async (file: File) => {
+        ultimoArchivoRef.current = file;
         setCargando(true);
+        setErrorCarga(false);
         try {
             const data = await cargarRutaExcel(file);
             setSesionId(data.sesionId);
             setFechasDisponibles(data.fechasDisponibles);
             setStep("fechas");
+        } catch {
+            // El interceptor de axios ya mostró el toast con el detalle del
+            // backend (422 = Excel inválido). Acá marcamos el flag para que
+            // el FileUploader pinte el dropzone en rojo y exponga "Reintentar".
+            setErrorCarga(true);
         } finally {
             setCargando(false);
         }
+    };
+
+    const handleRetryUpload = () => {
+        if (ultimoArchivoRef.current) handleUpload(ultimoArchivoRef.current);
     };
 
     const handleFechasConfirmadas = async (fechas: string[]) => {
@@ -52,11 +69,18 @@ export default function RutaPage() {
     const handleExportar = async (registrosCompletados: RegistroRutaDTO[]) => {
         if (!sesionId) return;
         setCargando(true);
+        setErrorExportar(false);
         try {
             const blob = await exportarRutaExcel(sesionId, {
                 registros: registrosCompletados,
             });
             saveAs(blob, `ruta_${sesionId}.xlsx`);
+        } catch {
+            // Toast con el detalle ya lo mostró el interceptor de axios.
+            // Acá marcamos el flag para que el botón se pinte como "Reintentar"
+            // y aparezca el cartel de error in-line — diferencia visual de
+            // "todavía no exportaste" vs "intentaste y falló".
+            setErrorExportar(true);
         } finally {
             setCargando(false);
         }
@@ -67,6 +91,9 @@ export default function RutaPage() {
         setSesionId(null);
         setFechasDisponibles([]);
         setRegistros([]);
+        setErrorCarga(false);
+        setErrorExportar(false);
+        ultimoArchivoRef.current = null;
     };
 
     return (
@@ -90,7 +117,12 @@ export default function RutaPage() {
 
                 <div className="mt-8">
                     {step === "carga" && (
-                        <RutaUploadStep onUpload={handleUpload} cargando={cargando} />
+                        <RutaUploadStep
+                            onUpload={handleUpload}
+                            cargando={cargando}
+                            hasError={errorCarga}
+                            onRetry={handleRetryUpload}
+                        />
                     )}
                     {step === "fechas" && (
                         <RutaFechasStep
@@ -104,6 +136,7 @@ export default function RutaPage() {
                             registros={registros}
                             onExportar={handleExportar}
                             cargando={cargando}
+                            errorExportar={errorExportar}
                         />
                     )}
                 </div>

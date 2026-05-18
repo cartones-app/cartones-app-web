@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import {
     Table,
     TableBody,
@@ -72,7 +73,6 @@ export default function AdminSesionRutaDetailPage() {
     }, [cargar]);
 
     const handleEliminarRegistro = async (id: number) => {
-        if (!confirm("¿Eliminar este registro?")) return;
         try {
             await eliminarRegistroRuta(id);
             toast.success("Registro eliminado");
@@ -214,14 +214,22 @@ export default function AdminSesionRutaDetailPage() {
                                         )}
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            onClick={() => handleEliminarRegistro(r.id)}
-                                            aria-label="Eliminar registro"
-                                        >
-                                            <Trash2 className="h-4 w-4 text-destructive" />
-                                        </Button>
+                                        <ConfirmDialog
+                                            title="¿Eliminar este registro?"
+                                            description="No se puede deshacer. El registro asociado al vendedor se borrará de la sesión."
+                                            confirmLabel="Eliminar"
+                                            destructive
+                                            onConfirm={() => handleEliminarRegistro(r.id)}
+                                            trigger={
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    aria-label="Eliminar registro"
+                                                >
+                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                </Button>
+                                            }
+                                        />
                                     </TableCell>
                                 </TableRow>
                             ))}

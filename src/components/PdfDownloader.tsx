@@ -36,14 +36,11 @@ export function PdfDownloader({ procesoId, onBack, onReset }: Readonly<PdfDownlo
     const successRef = useRef<HTMLDivElement | null>(null);
 
     const handleGenerateFiles = async () => {
-        // El backend bloquea si el proceso no está en estado SIMULADO (UnprocessableEntity).
-        // El flag local previene UX confusa de doble-click.
-        if (archivosGenerados) {
-            toast.warning("Los archivos ya fueron generados", {
-                description: "Podés descargarlos las veces que necesites.",
-            });
-            return;
-        }
+        // Guard inalcanzable en la práctica (el botón "Generar Archivos" solo
+        // se renderiza cuando `!archivosGenerados`), pero defendemos contra
+        // un futuro caller que invoque el handler sin la guarda del JSX —
+        // sin toast: lo único que aporta es ruido si llegara a dispararse.
+        if (archivosGenerados) return;
 
         setIsLoading(true);
         setErrorGenerando(false);

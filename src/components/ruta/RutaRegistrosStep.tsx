@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useCallback, useState } from "react";
-import { Download, Loader2 } from "lucide-react";
+import { AlertTriangle, Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -18,6 +18,13 @@ interface RutaRegistrosStepProps {
     registros: RegistroRutaDTO[];
     onExportar: (registros: RegistroRutaDTO[]) => void;
     cargando: boolean;
+    /**
+     * `true` cuando el último intento de exportar falló (HTTP no-2xx). El
+     * componente surfacea un mensaje en línea para que el usuario sepa que
+     * el click no fue ignorado, y para diferenciarlo del estado "todo OK,
+     * podés intentar más tarde".
+     */
+    errorExportar: boolean;
 }
 
 type EditableField =
@@ -46,6 +53,7 @@ export function RutaRegistrosStep({
     registros: registrosIniciales,
     onExportar,
     cargando,
+    errorExportar,
 }: Readonly<RutaRegistrosStepProps>) {
     const [registros, setRegistros] = useState<RegistroRutaDTO[]>(registrosIniciales);
 
@@ -91,12 +99,25 @@ export function RutaRegistrosStep({
                 <Button onClick={() => onExportar(registros)} disabled={cargando}>
                     {cargando ? (
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : errorExportar ? (
+                        <AlertTriangle className="h-4 w-4 mr-2" />
                     ) : (
                         <Download className="h-4 w-4 mr-2" />
                     )}
-                    Exportar Excel
+                    {errorExportar ? "Reintentar exportación" : "Exportar Excel"}
                 </Button>
             </div>
+            {errorExportar && !cargando && (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <div>
+                        <p className="font-medium">No se pudo exportar el Excel</p>
+                        <p className="text-destructive/80">
+                            Revisá el mensaje del toast con el detalle. Si el problema persiste, volvé a empezar (Empezar de nuevo) o probá más tarde.
+                        </p>
+                    </div>
+                </div>
+            )}
 
             <div className="rounded-lg border bg-card overflow-x-auto">
                 <Table>

@@ -45,7 +45,12 @@ export default function ResultadosPage() {
     const handleNewProcess = () => {
         reset();
         toast.success("Iniciando nuevo proceso");
-        router.push("/upload");
+        // `replace` (no `push`): después del reset el procesoId queda null;
+        // si dejáramos /resultados en el history y el user apretara Back,
+        // remontaría la página, el effect detectaría !procesoId y redirigiría
+        // a /upload de nuevo — loop Back → redirect → Back invisible para el
+        // usuario.
+        router.replace("/upload");
     };
 
     if (!procesoId || resultados.length === 0) {
