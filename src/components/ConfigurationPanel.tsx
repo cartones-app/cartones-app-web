@@ -277,16 +277,18 @@ export function ConfigurationPanel({
                                             <Input
                                                 type="number"
                                                 placeholder="Inicio"
+                                                aria-label={`Pool Seneté — rango ${index + 1} inicio`}
                                                 value={range.inicio}
                                                 onChange={(e) =>
                                                     updatePoolRange("senete", index, "inicio", e.target.value)
                                                 }
                                                 className="flex-1"
                                             />
-                                            <span className="text-muted-foreground">-</span>
+                                            <span className="text-muted-foreground" aria-hidden="true">-</span>
                                             <Input
                                                 type="number"
                                                 placeholder="Fin"
+                                                aria-label={`Pool Seneté — rango ${index + 1} fin`}
                                                 value={range.fin}
                                                 onChange={(e) =>
                                                     updatePoolRange("senete", index, "fin", e.target.value)
@@ -299,6 +301,7 @@ export function ConfigurationPanel({
                                                 size="icon"
                                                 onClick={() => removePoolRange("senete", index)}
                                                 className="shrink-0 text-destructive hover:text-destructive"
+                                                aria-label={`Eliminar Pool Seneté — rango ${index + 1}`}
                                             >
                                                 <Trash2 className="h-4 w-4" />
                                             </Button>
@@ -333,16 +336,18 @@ export function ConfigurationPanel({
                                             <Input
                                                 type="number"
                                                 placeholder="Inicio"
+                                                aria-label={`Pool Telebingo — rango ${index + 1} inicio`}
                                                 value={range.inicio}
                                                 onChange={(e) =>
                                                     updatePoolRange("telebingo", index, "inicio", e.target.value)
                                                 }
                                                 className="flex-1"
                                             />
-                                            <span className="text-muted-foreground">-</span>
+                                            <span className="text-muted-foreground" aria-hidden="true">-</span>
                                             <Input
                                                 type="number"
                                                 placeholder="Fin"
+                                                aria-label={`Pool Telebingo — rango ${index + 1} fin`}
                                                 value={range.fin}
                                                 onChange={(e) =>
                                                     updatePoolRange("telebingo", index, "fin", e.target.value)
@@ -355,6 +360,7 @@ export function ConfigurationPanel({
                                                 size="icon"
                                                 onClick={() => removePoolRange("telebingo", index)}
                                                 className="shrink-0 text-destructive hover:text-destructive"
+                                                aria-label={`Eliminar Pool Telebingo — rango ${index + 1}`}
                                             >
                                                 <Trash2 className="h-4 w-4" />
                                             </Button>
