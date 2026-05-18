@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CheckCircle2 } from "lucide-react";
@@ -14,10 +14,19 @@ export default function ResultadosPage() {
     const router = useRouter();
     const { procesoId, resultados, reset } = useProcesoStore();
 
-    // Redirect if no procesoId or results
+    // Snapshot del procesoId al mount. Si llegó con uno y después se vuelve
+    // null (por ejemplo, click en "Iniciar nuevo proceso" → reset()), NO
+    // queremos disparar el warning "No hay un proceso activo": el usuario
+    // ya sabe lo que está haciendo y el toast.success del handler le da
+    // feedback adecuado. El warning solo aplica para deep-links/refresh sin
+    // proceso.
+    const llegoConProcesoRef = useRef<boolean>(Boolean(procesoId));
+
     useEffect(() => {
         if (!procesoId) {
-            toast.warning("No hay un proceso activo");
+            if (!llegoConProcesoRef.current) {
+                toast.warning("No hay un proceso activo");
+            }
             router.push("/upload");
             return;
         }
