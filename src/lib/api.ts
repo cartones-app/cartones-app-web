@@ -334,9 +334,16 @@ export const clearFeatureFlagOverride = async (flagKey: string): Promise<void> =
 /**
  * GET /api/feature-flags — flags públicos (sin rol admin), usados para gating
  * de páginas del front. Devuelve { "page.upload.enabled": "true", ... }.
+ *
+ * `silent: true`: best-effort. Si falla durante la hidratación de NextAuth
+ * (sesión todavía no resuelta, race con el rewrite de Vercel, etc.) el
+ * provider cliente cae al default fail-open y reintenta cuando `status`
+ * pasa a `authenticated`. Sin esto, un toast molesto aparecía al abrir
+ * el home porque la request se disparaba antes de que NextAuth completara
+ * la hidratación y axios reportaba "Error de Conexión" / 401.
  */
 export const obtenerFlagsPublicos = async (): Promise<PublicFeatureFlags> => {
-    const response = await api.get<PublicFeatureFlags>('/api/feature-flags');
+    const response = await api.get<PublicFeatureFlags>('/api/feature-flags', { silent: true });
     return response.data;
 };
 
