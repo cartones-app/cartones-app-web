@@ -25,6 +25,7 @@ export default function RutaPage() {
     const [registros, setRegistros] = useState<RegistroRutaDTO[]>([]);
     const [cargando, setCargando] = useState(false);
     const [errorCarga, setErrorCarga] = useState(false);
+    const [errorExportar, setErrorExportar] = useState(false);
     // Guardamos el último archivo para que el botón "Reintentar" del
     // FileUploader pueda re-disparar el upload sin que el user tenga que
     // tirar y volver a soltar el Excel.
@@ -68,11 +69,18 @@ export default function RutaPage() {
     const handleExportar = async (registrosCompletados: RegistroRutaDTO[]) => {
         if (!sesionId) return;
         setCargando(true);
+        setErrorExportar(false);
         try {
             const blob = await exportarRutaExcel(sesionId, {
                 registros: registrosCompletados,
             });
             saveAs(blob, `ruta_${sesionId}.xlsx`);
+        } catch {
+            // Toast con el detalle ya lo mostró el interceptor de axios.
+            // Acá marcamos el flag para que el botón se pinte como "Reintentar"
+            // y aparezca el cartel de error in-line — diferencia visual de
+            // "todavía no exportaste" vs "intentaste y falló".
+            setErrorExportar(true);
         } finally {
             setCargando(false);
         }
@@ -84,6 +92,7 @@ export default function RutaPage() {
         setFechasDisponibles([]);
         setRegistros([]);
         setErrorCarga(false);
+        setErrorExportar(false);
         ultimoArchivoRef.current = null;
     };
 
@@ -127,6 +136,7 @@ export default function RutaPage() {
                             registros={registros}
                             onExportar={handleExportar}
                             cargando={cargando}
+                            errorExportar={errorExportar}
                         />
                     )}
                 </div>
