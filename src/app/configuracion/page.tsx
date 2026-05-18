@@ -87,10 +87,18 @@ export default function ConfiguracionPage() {
             return;
         }
 
-        // Fetch vendedores
+        // Flag de cleanup para descartar la respuesta si el componente se
+        // desmonta (navegación a /upload, cambio de procesoId) o si el effect
+        // se re-dispara antes de que termine el fetch. Sin esto, una respuesta
+        // tardía de un procesoId viejo podría pisar `vendedores` del nuevo o
+        // re-inicializar `vendedorInputs` con datos del anterior tras un
+        // resetConfig() implícito.
+        let cancelado = false;
+
         const fetchVendedores = async () => {
             try {
                 const data = await getVendedores(procesoId);
+                if (cancelado) return;
                 setVendedores(data);
                 // Solo inicializar vendedorInputs si no hay nada en el store —
                 // si el usuario ya editó terminaciones y vuelve desde /resultados,
@@ -112,11 +120,15 @@ export default function ConfiguracionPage() {
             } catch {
                 // Error handled by axios interceptor
             } finally {
-                setIsLoading(false);
+                if (!cancelado) setIsLoading(false);
             }
         };
 
         fetchVendedores();
+
+        return () => {
+            cancelado = true;
+        };
     }, [procesoId, router, setVendedores, patchConfig]);
 
     const handleUpdateVendedor = (
