@@ -53,7 +53,13 @@ export default function ConfiguracionPage() {
     // Derivado del store: si hay resultados, ya simulamos. Evita race con la
     // hidratación async de zustand/persist en el primer render.
     const hasSimulated = resultados.length > 0;
-    const [showResultsPreview, setShowResultsPreview] = useState(resultados.length > 0);
+    // El user puede colapsar/expandir manualmente el preview, pero si el store
+    // se queda sin resultados (reset desde otra pestaña / sincronización), el
+    // preview no debería mostrarse "vacío con mensaje de error". Combinamos el
+    // toggle local con el length del store: visible solo cuando ambos lo
+    // permiten.
+    const [previewExpandido, setPreviewExpandido] = useState(true);
+    const showResultsPreview = previewExpandido && resultados.length > 0;
 
     // La config vive en el store — al volver desde /resultados los rangos /
     // terminaciones / fechas siguen ahí. Las fechas se transportan como Date
@@ -156,7 +162,7 @@ export default function ConfiguracionPage() {
             setResultados(resultados);
             setCurrentStep(3);
             // hasSimulated se deriva de resultados.length, ya quedó implícito.
-            setShowResultsPreview(true);
+            setPreviewExpandido(true);
             toast.success("Simulación completada", {
                 description: "Revisa los resultados asignados en la tabla inferior.",
             });
@@ -248,7 +254,7 @@ export default function ConfiguracionPage() {
                         onUpdateVendedor={handleUpdateVendedor}
                         resultados={resultados}
                         showResultsPreview={showResultsPreview}
-                        setShowResultsPreview={setShowResultsPreview}
+                        setShowResultsPreview={setPreviewExpandido}
                     />
 
                     {/* Action Buttons - Only Back button remains, others moved to sticky bar */}
