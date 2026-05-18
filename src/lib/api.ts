@@ -88,10 +88,15 @@ export const generarArchivosProceso = async (
  * usuario descarta el proceso vía "reiniciar sesión". El endpoint es
  * idempotente y devuelve 204; si el proceso ya estaba completado el backend
  * responde 422 y el caller lo ignora — no necesitamos limpiar algo terminado.
+ *
+ * `silent: true`: la 422 esperable (proceso ya completado) o cualquier otra
+ * falla NO debe spammear toasts al usuario en medio del flujo de reiniciar.
+ * El caller hace `.catch(() => {})` en el store.
+ *
  * POST /api/distribuciones/{procesoId}/abandonar
  */
 export const abandonarProceso = async (procesoId: string): Promise<void> => {
-    await api.post(`/api/distribuciones/${encodeURIComponent(procesoId)}/abandonar`);
+    await api.post(`/api/distribuciones/${encodeURIComponent(procesoId)}/abandonar`, undefined, { silent: true });
 };
 
 /**
