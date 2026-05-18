@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PageHeader } from "@/components/PageHeader";
 import { TableSkeleton } from "@/components/TableSkeleton";
 import {
@@ -103,7 +104,6 @@ export default function AdminExclusionesRutaPage() {
     };
 
     const handleDelete = async (id: number) => {
-        if (!confirm("¿Eliminar esta exclusión?")) return;
         try {
             await eliminarExclusion(id);
             toast.success("Exclusión eliminada");
@@ -237,14 +237,28 @@ export default function AdminExclusionesRutaPage() {
                                             >
                                                 <Pencil className="h-4 w-4" />
                                             </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => handleDelete(e.id)}
-                                                aria-label="Eliminar"
-                                            >
-                                                <Trash2 className="h-4 w-4 text-destructive" />
-                                            </Button>
+                                            <ConfirmDialog
+                                                title="¿Eliminar esta exclusión?"
+                                                description={
+                                                    <>
+                                                        Quitar &quot;<span className="font-medium">{e.nombre}</span>&quot;
+                                                        de la lista de exclusiones. Los próximos uploads de ruta
+                                                        van a incluir filas con este vendedor.
+                                                    </>
+                                                }
+                                                confirmLabel="Eliminar"
+                                                destructive
+                                                onConfirm={() => handleDelete(e.id)}
+                                                trigger={
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        aria-label="Eliminar"
+                                                    >
+                                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                                    </Button>
+                                                }
+                                            />
                                         </div>
                                     </TableCell>
                                 </TableRow>

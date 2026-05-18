@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PageHeader } from "@/components/PageHeader";
 import { TableSkeleton } from "@/components/TableSkeleton";
 import { formatFechaHora } from "@/lib/date-format";
@@ -64,9 +65,6 @@ export default function AdminSesionesRutaPage() {
     }, []);
 
     const handleEliminar = async (sesionId: string) => {
-        if (!confirm("¿Eliminar esta sesión y todos sus registros? Esta acción no se puede deshacer.")) {
-            return;
-        }
         setEliminando(sesionId);
         try {
             await eliminarSesionRuta(sesionId);
@@ -187,20 +185,36 @@ export default function AdminSesionesRutaPage() {
                                                     <ChevronRight className="h-3 w-3 ml-1 hidden sm:inline" />
                                                 </Link>
                                             </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                disabled={s.estado === "ACTIVA" || eliminando === s.sesionId}
-                                                onClick={() => handleEliminar(s.sesionId)}
-                                                aria-label="Eliminar sesión"
-                                                title={
-                                                    s.estado === "ACTIVA"
-                                                        ? "No se puede eliminar una sesión activa"
-                                                        : "Eliminar"
+                                            <ConfirmDialog
+                                                title="¿Eliminar esta sesión?"
+                                                description={
+                                                    <>
+                                                        Se borrarán también todos los registros asociados a{" "}
+                                                        <span className="font-mono">{shortId(s.sesionId)}</span>. Esta
+                                                        acción no se puede deshacer.
+                                                    </>
                                                 }
-                                            >
-                                                <Trash2 className="h-4 w-4 text-destructive" />
-                                            </Button>
+                                                confirmLabel="Eliminar"
+                                                destructive
+                                                onConfirm={() => handleEliminar(s.sesionId)}
+                                                trigger={
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        disabled={
+                                                            s.estado === "ACTIVA" || eliminando === s.sesionId
+                                                        }
+                                                        aria-label="Eliminar sesión"
+                                                        title={
+                                                            s.estado === "ACTIVA"
+                                                                ? "No se puede eliminar una sesión activa"
+                                                                : "Eliminar"
+                                                        }
+                                                    >
+                                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                                    </Button>
+                                                }
+                                            />
                                         </div>
                                     </TableCell>
                                 </TableRow>
