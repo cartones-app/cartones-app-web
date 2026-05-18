@@ -196,6 +196,9 @@ export default function AdminSesionesRutaPage() {
                                                 }
                                                 confirmLabel="Eliminar"
                                                 destructive
+                                                disabled={
+                                                    s.estado === "ACTIVA" || eliminando === s.sesionId
+                                                }
                                                 onConfirm={() => handleEliminar(s.sesionId)}
                                                 trigger={
                                                     <Button

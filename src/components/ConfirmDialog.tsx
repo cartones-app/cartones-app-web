@@ -25,6 +25,14 @@ interface ConfirmDialogProps {
     /** Si true, el botón confirmatorio queda en variante destructiva (rojo). */
     destructive?: boolean;
     /**
+     * Si true, el dialog NO se abre (gate semántico del propio componente).
+     * El trigger sigue renderizándose para mantener consistencia visual; lo
+     * típico es que el caller también marque `disabled` en el botón hijo
+     * pero esta prop garantiza que aunque alguien hiciera un trigger custom
+     * que ignora el atributo (div, span, etc.) el dialog quede inaccesible.
+     */
+    disabled?: boolean;
+    /**
      * Handler de confirmación. Si retorna Promise, mantenemos el diálogo
      * abierto y deshabilitamos los botones hasta que resuelva — así una
      * acción async puede mostrar "Eliminando..." sin parpadeos.
@@ -60,6 +68,7 @@ export function ConfirmDialog({
     confirmLabel = "Confirmar",
     cancelLabel = "Cancelar",
     destructive = false,
+    disabled = false,
     onConfirm,
 }: Readonly<ConfirmDialogProps>) {
     const [open, setOpen] = useState(false);
@@ -85,7 +94,20 @@ export function ConfirmDialog({
     };
 
     return (
-        <AlertDialog open={open} onOpenChange={(o) => !pendiente && setOpen(o)}>
+        <AlertDialog
+            open={open}
+            onOpenChange={(o) => {
+                // Bloqueos:
+                //   - `pendiente`: no cerrar mientras el handler async corre.
+                //   - `disabled`: nunca abrir si el caller lo deshabilitó.
+                //     Permitimos cerrar (o=false) en cualquier caso para no
+                //     atrapar al usuario si el dialog ya estaba abierto y
+                //     `disabled` flipó a true mid-flight.
+                if (pendiente) return;
+                if (o && disabled) return;
+                setOpen(o);
+            }}
+        >
             <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
             <AlertDialogContent>
                 <AlertDialogHeader>

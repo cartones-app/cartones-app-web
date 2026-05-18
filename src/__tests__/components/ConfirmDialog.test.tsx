@@ -75,6 +75,29 @@ describe("ConfirmDialog", () => {
 
         deferred.resolve();
         await waitFor(() => expect(onConfirm).toHaveBeenCalled());
+        // Tras resolver el handler, el dialog debe cerrarse — si alguien
+        // rompe el setOpen(false) del happy path, este assert lo agarra.
+        await waitFor(() =>
+            expect(screen.queryByRole("button", { name: /confirmar/i })).not.toBeInTheDocument(),
+        );
+    });
+
+    it("no abre el diálogo si la prop disabled está activa", () => {
+        // Defensa contra triggers custom (div/span) que no respetan el atributo
+        // `disabled` del button HTML. El ConfirmDialog gate-ea por sí mismo.
+        const onConfirm = vi.fn();
+        render(
+            <ConfirmDialog
+                title="¿Eliminar?"
+                description="Sin retorno"
+                disabled
+                onConfirm={onConfirm}
+                trigger={<Button>Borrar</Button>}
+            />,
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Borrar" }));
+        expect(screen.queryByRole("button", { name: /confirmar/i })).not.toBeInTheDocument();
+        expect(onConfirm).not.toHaveBeenCalled();
     });
 
     it("cierra el diálogo aunque el handler async falle (no atrapa al usuario)", async () => {
