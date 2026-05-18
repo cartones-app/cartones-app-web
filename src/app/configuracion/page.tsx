@@ -204,7 +204,17 @@ export default function ConfiguracionPage() {
                         <span className="text-xs text-muted-foreground hidden sm:block">
                             Proceso: {shortId(procesoId)}
                         </span>
-                        <Button variant="ghost" size="sm" onClick={handleReset}>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleReset}
+                            // Durante isSimulating la request está en flight: si el user
+                            // resetea ahora, el `setResultados` del handler (que corre
+                            // cuando vuelve la respuesta) escribe sobre el store ya
+                            // limpio, dejando el wizard en un estado inconsistente
+                            // (procesoId=null + resultados con datos del proceso anterior).
+                            disabled={isSimulating}
+                        >
                             <RotateCcw className="h-4 w-4 mr-2" />
                             Reiniciar
                         </Button>
@@ -243,7 +253,7 @@ export default function ConfiguracionPage() {
 
                     {/* Action Buttons - Only Back button remains, others moved to sticky bar */}
                     <div className="pt-4">
-                        <Button variant="outline" onClick={handleBack}>
+                        <Button variant="outline" onClick={handleBack} disabled={isSimulating}>
                             <ArrowLeft className="h-4 w-4 mr-2" />
                             Volver
                         </Button>
