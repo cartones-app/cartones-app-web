@@ -103,13 +103,22 @@ export default function AdminSesionesRutaPage() {
             >
                 <div className="grid gap-1.5">
                     <Label htmlFor="filtro-estado">Estado</Label>
-                    <Input
+                    {/* select nativo (no shadcn): el set de valores es cerrado
+                        (ACTIVA / COMPLETADA / ARCHIVADA) y la API backend hace
+                        match case-sensitive. Un input libre llevaba al user a
+                        escribir "activa" minúscula y recibir lista vacía sin
+                        explicación. */}
+                    <select
                         id="filtro-estado"
-                        placeholder="ACTIVA, COMPLETADA, …"
                         value={filtroEstado}
                         onChange={(e) => setFiltroEstado(e.target.value)}
-                        className="h-9 w-44"
-                    />
+                        className="h-9 w-44 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs"
+                    >
+                        <option value="">Todos</option>
+                        <option value="ACTIVA">ACTIVA</option>
+                        <option value="COMPLETADA">COMPLETADA</option>
+                        <option value="ARCHIVADA">ARCHIVADA</option>
+                    </select>
                 </div>
                 <div className="grid gap-1.5">
                     <Label htmlFor="filtro-createdBy">Creado por</Label>
