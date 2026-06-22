@@ -27,6 +27,9 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
 
 # 2. Copia código y compila.
 COPY . .
+# `public/` puede no existir en el repo (no hay assets estáticos propios).
+# Lo creamos para que el `COPY /app/public` del runtime no falle el build.
+RUN mkdir -p public
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     pnpm build
 
