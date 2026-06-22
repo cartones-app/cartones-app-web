@@ -63,6 +63,11 @@ jobs:
           cat > .env <<EOF
           BACKEND_INTERNAL_URL=${{ vars.BACKEND_INTERNAL_URL }}
           NEXTAUTH_URL=${{ vars.NEXTAUTH_URL }}
+          # NextAuth v5 lee AUTH_URL (no NEXTAUTH_URL). Fijarlo al dominio real
+          # cierra el open-redirect del callbackUrl. AUTH_TRUST_HOST=true es
+          # seguro porque Cloudflare + nginx-proxy sanitizan X-Forwarded-Host.
+          AUTH_URL=${{ vars.NEXTAUTH_URL }}
+          AUTH_TRUST_HOST=true
           AUTH_KEYCLOAK_ISSUER=${{ vars.AUTH_KEYCLOAK_ISSUER }}
           AUTH_SECRET=${{ secrets.AUTH_SECRET }}
           AUTH_KEYCLOAK_ID=${{ secrets.AUTH_KEYCLOAK_ID }}
