@@ -13,6 +13,16 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  // Código generado por la CLI de shadcn. No lo refactorizamos para no
+  // divergir del upstream; las reglas nuevas de react-hooks de next 16
+  // (set-state-in-effect, purity) chocan con patrones que shadcn aún usa.
+  {
+    files: ["src/components/ui/**/*.{ts,tsx}", "src/hooks/use-mobile.ts"],
+    rules: {
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/purity": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

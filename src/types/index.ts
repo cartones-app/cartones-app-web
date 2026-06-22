@@ -50,6 +50,138 @@ export interface BackendErrorResponse {
     details: string[];
 }
 
+// Resumen de un ProcesoDistribucion para listados.
+// Backend: ProcesoDistribucionResumenDTO. Los PDFs ya no se guardan en DB —
+// el estado se deriva de los timestamps: disponibles ⇔ generados != null && borrados == null.
+export interface ProcesoDistribucionResumenDTO {
+    procesoId: string;
+    estado: string;
+    createdAt: string; // ISO 8601 (LocalDateTime serializado)
+    updatedAt: string;
+    createdBy: string;
+    archivosGeneradosEn: string | null;
+    archivosBorradosEn: string | null;
+}
+
+/** Helper de UI: ¿se puede descargar este proceso ahora mismo? */
+export function archivosDisponibles(p: ProcesoDistribucionResumenDTO): boolean {
+    return p.archivosGeneradosEn !== null && p.archivosBorradosEn === null;
+}
+
+/** Backend: ArchivosGeneradosDTO. Response del POST /api/distribuciones/{id}/archivos. */
+export interface ArchivosGeneradosDTO {
+    procesoId: string;
+    archivosGeneradosEn: string;
+}
+
+// ============================================================================
+// Configuración de archivos (admin)
+// ============================================================================
+
+/** Backend: ConfiguracionArchivosDTO. GET /api/admin/configuracion-archivos. */
+export interface ConfiguracionArchivosDTO {
+    retencionMeses: number;
+    eliminacionActiva: boolean;
+    updatedAt: string;
+    modifiedBy: string | null;
+}
+
+/** Backend: ActualizarConfiguracionArchivosRequest. PUT /api/admin/configuracion-archivos. */
+export interface ActualizarConfiguracionArchivosRequest {
+    retencionMeses: number;
+    eliminacionActiva: boolean;
+}
+
+// ============================================================================
+// Módulo Ruta
+// ============================================================================
+
+/** Backend: CargaRutaResponseDTO. POST /api/ruta/carga */
+export interface CargaRutaResponseDTO {
+    sesionId: string;
+    fechasDisponibles: string[];
+}
+
+/** Backend: FiltroFechaRequestDTO. POST /api/ruta/{sesionId}/registros */
+export interface FiltroFechaRequestDTO {
+    fechas: string[];
+}
+
+/** Backend: RegistroRutaDTO. Item del listado tras filtrar por fechas. */
+export interface RegistroRutaDTO {
+    vendedorId: number;
+    nombre: string;
+    fecha: string;
+    deudaAnterior: number;
+    numeroFila: number;
+    seneteTotalEnviado: number | null;
+    telebingoTotalEnviado: number | null;
+    refSenete: number | null;
+    refTelb: number | null;
+    devSen: number | null;
+    devTelb: number | null;
+    pago1: number | null;
+    pago2: number | null;
+    nota: string | null;
+}
+
+/** Backend: ExportarRutaRequestDTO. POST /api/ruta/{sesionId}/exportar */
+export interface ExportarRutaRequestDTO {
+    registros: RegistroRutaDTO[];
+}
+
+/** Backend: SesionRutaResponseDTO. Admin: vista listado. */
+export interface SesionRutaResponseDTO {
+    id: number;
+    sesionId: string;
+    fechaFiltro: string;
+    estado: string;
+    totalRegistros: number | null;
+    registrosCompletados: number | null;
+    createdAt: string;
+    createdBy: string;
+}
+
+/** Backend: SesionRutaRegistroResponseDTO. Admin: detalle de registros de una sesión. */
+export interface SesionRutaRegistroResponseDTO {
+    id: number;
+    vendedorNombre: string | null;
+    fecha: string;
+    seneteTotalEnviado: number | null;
+    telebingoTotalEnviado: number | null;
+    refSenete: number | null;
+    refTelb: number | null;
+    devSen: number | null;
+    devTelb: number | null;
+    pago1: number | null;
+    pago2: number | null;
+    nota: string | null;
+    completado: boolean | null;
+    createdAt: string;
+}
+
+/** Backend: EliminarSesionesRequestDTO. DELETE /api/admin/ruta/sesiones (bulk). */
+export interface EliminarSesionesRequestDTO {
+    sesionIds: string[];
+}
+
+/** Backend: ExclusionRutaRequestDTO. POST/PUT /api/admin/ruta/exclusiones[/{id}] */
+export interface ExclusionRutaRequestDTO {
+    nombre: string;
+    descripcion?: string;
+    activo?: boolean;
+}
+
+/** Backend: ExclusionRutaResponseDTO. */
+export interface ExclusionRutaResponseDTO {
+    id: number;
+    nombre: string;
+    descripcion: string | null;
+    activo: boolean;
+    createdAt: string;
+    createdBy: string | null;
+}
+
 // Form types for the wizard
 export interface PoolRangeForm {
     inicio: string;
@@ -65,4 +197,67 @@ export interface ConfigurationFormData {
     vendedores: VendedorInputDTO[];
     inicioSeneteGral: string;
     inicioTelebingoGral: string;
+}
+
+// ============================================================================
+// Feature flags (admin)
+// ============================================================================
+
+export type FlagValueType = "BOOLEAN" | "STRING" | "LONG";
+
+/** Backend: FlagViewDTO. GET /api/admin/feature-flags. */
+export interface FlagViewDTO {
+    key: string;
+    type: FlagValueType;
+    description: string;
+    defaultValue: string;
+    effectiveValue: string;
+    hasOverride: boolean;
+    overrideValue: string | null;
+    overrideReason: string | null;
+    modifiedBy: string | null;
+    updatedAt: string | null; // ISO LocalDateTime
+}
+
+/** Backend: SetFlagRequest. PUT /api/admin/feature-flags/{key}. */
+export interface SetFlagRequest {
+    value: string;
+    reason?: string;
+}
+
+/**
+ * Backend: GET /api/feature-flags — map de flag key → valor efectivo serializado.
+ * Solo incluye los flags marcados publicRead=true en el registry.
+ */
+export type PublicFeatureFlags = Record<string, string>;
+
+// --- Preferencias de impresión de etiquetas -------------------------------
+
+export type LayoutEtiqueta = "TRES_POR_HOJA" | "CUATRO_POR_HOJA";
+export type OrdenEtiqueta = "SECUENCIAL" | "INTERCALADO";
+
+/** Backend: GET /api/me/preferencias-etiquetas | GET /api/admin/.../{username} */
+export interface PreferenciasEtiquetasDTO {
+    username: string;
+    layoutEtiqueta: LayoutEtiqueta;
+    ordenEtiqueta: OrdenEtiqueta;
+    updatedAt: string;
+    modifiedBy: string | null;
+}
+
+/** Backend: PUT /api/me/preferencias-etiquetas | PUT /api/admin/.../{username} */
+export interface ActualizarPreferenciasRequest {
+    layoutEtiqueta: LayoutEtiqueta;
+    ordenEtiqueta: OrdenEtiqueta;
+}
+
+/** Backend: GET /api/admin/preferencias-etiquetas (Spring Page<T>) */
+export interface PageResponse<T> {
+    content: T[];
+    number: number;
+    size: number;
+    totalElements: number;
+    totalPages: number;
+    first: boolean;
+    last: boolean;
 }

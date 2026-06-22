@@ -1,0 +1,86 @@
+# Compose local del frontend con hot-reload.
+#
+# Pensado para correr JUNTO con el docker-compose del backend (cartones-app-api),
+# que ya levanta postgres + keycloak (realm "cartones") + backend.
+# Acá solo vive el frontend en modo dev.
+#
+# ¿Por qué network_mode: host?
+#   El realm de Keycloak se importa con KC_HOSTNAME=localhost, así que el
+#   claim `iss` de los JWT es http://localhost:8080/realms/cartones.
+#   - Desde el browser: localhost:8080 = keycloak (port publicado al host). OK.
+#   - Desde adentro del container del front: localhost:8080 = el container mismo.
+#     La BFF (auth.ts) no podría refrescar tokens.
+#   Con network_mode: host, el container comparte el namespace de red del host,
+#   así "localhost" significa lo mismo adentro y afuera. La iss del token
+#   matchea sin reescribir URLs ni mapear hostnames.
+#   Limitación: requiere Linux (incluye WSL2). En Mac/Windows nativo no aplica.
+#
+# Uso:
+#   1) Levantar el stack del backend:
+#        cd ../cartones-app-api && docker compose up -d
+#   2) Levantar el front:
+#        docker compose -f docker-compose.local.yml up
+#      (sin -d para ver los logs de Next.js / hot-reload)
+#
+#   Frontend en http://localhost:3000
+#   Logs: queda en foreground. Ctrl+C para bajar.
+#
+# Reinstalar deps (cambiaste pnpm-lock):
+#   docker compose -f docker-compose.local.yml down
+#   docker volume rm cartones-app-web_frontend_node_modules
+#   docker compose -f docker-compose.local.yml up
+
+services:
+  frontend:
+    image: node:22-alpine
+    container_name: cartones_frontend_dev
+    restart: unless-stopped
+    working_dir: /app
+    # corepack habilita la versión pinneada de pnpm (packageManager en package.json).
+    # Hace install solo si no existe node_modules (volume montado), después dev.
+    command:
+      - sh
+      - -c
+      - |
+        corepack enable
+        if [ ! -d node_modules/next ]; then
+          echo ">> Instalando deps con pnpm…"
+          pnpm install --frozen-lockfile
+        fi
+        exec pnpm dev
+    environment:
+      # Defaults alineados al realm que importa el backend:
+      #   client "frontend" (confidential + PKCE), realm "cartones".
+      # Pueden overridearse exportando antes de levantar compose.
+      # BACKEND_INTERNAL_URL (NO NEXT_PUBLIC_): solo el Next server la usa
+      # para los rewrites de /api-proxy/*. Con network_mode: host, localhost
+      # del container resuelve a localhost del host = donde Spring publica.
+      BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://localhost:9001}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      AUTH_SECRET: ${AUTH_SECRET:-local-dev-secret-do-not-use-in-prod}
+      AUTH_KEYCLOAK_ID: ${AUTH_KEYCLOAK_ID:-frontend}
+      # Client público: no hay secret real, pero la env tiene que existir.
+      AUTH_KEYCLOAK_SECRET: ${AUTH_KEYCLOAK_SECRET:-public-client}
+      AUTH_KEYCLOAK_ISSUER: ${AUTH_KEYCLOAK_ISSUER:-http://localhost:8080/realms/cartones}
+      # Next/Node listen on 0.0.0.0 dentro del container (irrelevante en host mode,
+      # pero deja explícito que es dev server).
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+      # Watch confiable cuando el filesystem es bind mount (WSL2/Docker Desktop).
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    network_mode: host
+    volumes:
+      # Código fuente: hot-reload via bind mount.
+      - .:/app
+      # node_modules en volumen aparte para no contaminar el host y para que
+      # las builds de deps con binarios nativos (lightningcss, etc) usen las
+      # del container (Linux/Alpine), no las del host.
+      - frontend_node_modules:/app/node_modules
+      # Lo mismo para .next (build cache) — evita conflictos si corriste
+      # `pnpm dev` en el host antes.
+      - frontend_next_cache:/app/.next
+
+volumes:
+  frontend_node_modules:
+  frontend_next_cache:

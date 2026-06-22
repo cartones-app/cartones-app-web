@@ -1,18 +1,32 @@
 "use client";
 
-import { useState } from "react";
-import { Calendar as CalendarIcon, Plus, Trash2, Play, ArrowRight, ArrowLeft } from "lucide-react";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { useDeferredValue, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
+import { Calendar as CalendarIcon, Loader2, Plus, Trash2, Play, ArrowRight, ArrowLeft, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatFechaLarga } from "@/lib/date-format";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
+// react-day-picker pesa ~30KB gz y aporta DOM grande. Las dos fechas son
+// OPCIONALES — la mayoría de los flujos no abren los popovers. next/dynamic
+// con ssr:false (el Calendar es interactivo, no aporta SSR) hace que el chunk
+// se baje solo cuando el user efectivamente abre un popover.
+const Calendar = dynamic(
+    () => import("@/components/ui/calendar").then((m) => m.Calendar),
+    {
+        ssr: false,
+        loading: () => (
+            <div className="flex items-center justify-center p-6 min-h-[280px] min-w-[260px]">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+        ),
+    },
+);
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Search } from "lucide-react";
 import { PoolRangeForm, VendedorInputDTO, VendedorResponseDTO, VendedorSimuladoDTO } from "@/types";
 import { VendedorAccordion } from "./VendedorAccordion";
 import { ResultsTable } from "./ResultsTable";
@@ -37,7 +51,7 @@ interface ConfigurationPanelProps {
     hasSimulated: boolean;
     onVerResultados: () => void;
     // List Data
-    vendedores: any[];
+    vendedores: VendedorResponseDTO[];
     vendedorInputs: VendedorInputDTO[];
     onUpdateVendedor: (id: number, field: keyof VendedorInputDTO, value: number | null | undefined) => void;
     // Results Data
@@ -65,25 +79,39 @@ export function ConfigurationPanel({
     isSimulating,
     hasSimulated,
     onVerResultados,
-    // New props
     vendedores,
     vendedorInputs,
     onUpdateVendedor,
     resultados,
     showResultsPreview,
     setShowResultsPreview,
-}: ConfigurationPanelProps) {
+}: Readonly<ConfigurationPanelProps>) {
     const [searchTerm, setSearchTerm] = useState("");
+    // useDeferredValue: el input se actualiza en cada keystroke (responsive),
+    // pero el filtering pesado contra `vendedorInputs` y `resultados` se
+    // calcula contra un valor diferido. Con N=200+ vendedores, evita
+    // freezear el input mientras React re-renderiza el accordion/tabla.
+    const deferredSearch = useDeferredValue(searchTerm);
+    const normalizedSearch = deferredSearch.toLowerCase();
 
-    // Filter logic
-    const filteredVendedores = vendedorInputs.filter(v =>
-        v.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        v.id.toString().includes(searchTerm)
+    const filteredVendedores = useMemo(
+        () =>
+            vendedorInputs.filter(
+                (v) =>
+                    v.nombre.toLowerCase().includes(normalizedSearch) ||
+                    v.id.toString().includes(deferredSearch),
+            ),
+        [vendedorInputs, normalizedSearch, deferredSearch],
     );
 
-    const filteredResultados = resultados.filter(r =>
-        r.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.id.toString().includes(searchTerm)
+    const filteredResultados = useMemo(
+        () =>
+            resultados.filter(
+                (r) =>
+                    r.nombre.toLowerCase().includes(normalizedSearch) ||
+                    r.id.toString().includes(deferredSearch),
+            ),
+        [resultados, normalizedSearch, deferredSearch],
     );
     const addPoolRange = (type: "senete" | "telebingo") => {
         const newRange = { inicio: "", fin: "" };
@@ -143,7 +171,7 @@ export function ConfigurationPanel({
                                     >
                                         <CalendarIcon className="mr-2 h-4 w-4" />
                                         {fechaSorteoSenete ? (
-                                            format(fechaSorteoSenete, "PPP", { locale: es })
+                                            formatFechaLarga(fechaSorteoSenete)
                                         ) : (
                                             <span>Seleccionar fecha</span>
                                         )}
@@ -174,7 +202,7 @@ export function ConfigurationPanel({
                                     >
                                         <CalendarIcon className="mr-2 h-4 w-4" />
                                         {fechaSorteoTelebingo ? (
-                                            format(fechaSorteoTelebingo, "PPP", { locale: es })
+                                            formatFechaLarga(fechaSorteoTelebingo)
                                         ) : (
                                             <span>Seleccionar fecha</span>
                                         )}
@@ -249,16 +277,18 @@ export function ConfigurationPanel({
                                             <Input
                                                 type="number"
                                                 placeholder="Inicio"
+                                                aria-label={`Pool Seneté — rango ${index + 1} inicio`}
                                                 value={range.inicio}
                                                 onChange={(e) =>
                                                     updatePoolRange("senete", index, "inicio", e.target.value)
                                                 }
                                                 className="flex-1"
                                             />
-                                            <span className="text-muted-foreground">-</span>
+                                            <span className="text-muted-foreground" aria-hidden="true">-</span>
                                             <Input
                                                 type="number"
                                                 placeholder="Fin"
+                                                aria-label={`Pool Seneté — rango ${index + 1} fin`}
                                                 value={range.fin}
                                                 onChange={(e) =>
                                                     updatePoolRange("senete", index, "fin", e.target.value)
@@ -271,6 +301,7 @@ export function ConfigurationPanel({
                                                 size="icon"
                                                 onClick={() => removePoolRange("senete", index)}
                                                 className="shrink-0 text-destructive hover:text-destructive"
+                                                aria-label={`Eliminar Pool Seneté — rango ${index + 1}`}
                                             >
                                                 <Trash2 className="h-4 w-4" />
                                             </Button>
@@ -305,16 +336,18 @@ export function ConfigurationPanel({
                                             <Input
                                                 type="number"
                                                 placeholder="Inicio"
+                                                aria-label={`Pool Telebingo — rango ${index + 1} inicio`}
                                                 value={range.inicio}
                                                 onChange={(e) =>
                                                     updatePoolRange("telebingo", index, "inicio", e.target.value)
                                                 }
                                                 className="flex-1"
                                             />
-                                            <span className="text-muted-foreground">-</span>
+                                            <span className="text-muted-foreground" aria-hidden="true">-</span>
                                             <Input
                                                 type="number"
                                                 placeholder="Fin"
+                                                aria-label={`Pool Telebingo — rango ${index + 1} fin`}
                                                 value={range.fin}
                                                 onChange={(e) =>
                                                     updatePoolRange("telebingo", index, "fin", e.target.value)
@@ -327,6 +360,7 @@ export function ConfigurationPanel({
                                                 size="icon"
                                                 onClick={() => removePoolRange("telebingo", index)}
                                                 className="shrink-0 text-destructive hover:text-destructive"
+                                                aria-label={`Eliminar Pool Telebingo — rango ${index + 1}`}
                                             >
                                                 <Trash2 className="h-4 w-4" />
                                             </Button>
@@ -410,7 +444,7 @@ export function ConfigurationPanel({
                             <ResultsTable resultados={filteredResultados} />
                         ) : (
                             <div className="text-center py-10 text-muted-foreground">
-                                No se encontraron resultados para "{searchTerm}"
+                                No se encontraron resultados para &quot;{searchTerm}&quot;
                             </div>
                         )}
                     </div>
@@ -427,7 +461,7 @@ export function ConfigurationPanel({
                             />
                         ) : (
                             <div className="text-center py-10 text-muted-foreground">
-                                No se encontraron vendedores para "{searchTerm}"
+                                No se encontraron vendedores para &quot;{searchTerm}&quot;
                             </div>
                         )}
                     </>

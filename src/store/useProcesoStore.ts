@@ -1,21 +1,72 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { VendedorResponseDTO, VendedorSimuladoDTO } from '@/types';
+import { abandonarProceso } from '@/lib/api';
+import {
+    PoolRangeForm,
+    VendedorInputDTO,
+    VendedorResponseDTO,
+    VendedorSimuladoDTO,
+} from '@/types';
+
+/**
+ * Estado de la configuración del wizard. Vive en memoria (sin localStorage)
+ * para sobrevivir navegación entre /configuracion y /resultados sin que el
+ * usuario pierda sus rangos / fechas / terminaciones al ir y volver.
+ *
+ * Fecha como ISO `yyyy-MM-dd` (no Date) — Date no serializa limpio si
+ * en algún momento queremos persistir, y los components ya parsean a Date
+ * en su capa.
+ */
+export interface ConfigState {
+    fechaSorteoSenete: string | null;
+    fechaSorteoTelebingo: string | null;
+    poolSenete: PoolRangeForm[];
+    poolTelebingo: PoolRangeForm[];
+    mezclar: boolean;
+    vendedorInputs: VendedorInputDTO[];
+    inicioSeneteGral: string;
+    inicioTelebingoGral: string;
+}
+
+const emptyConfig: ConfigState = {
+    fechaSorteoSenete: null,
+    fechaSorteoTelebingo: null,
+    poolSenete: [],
+    poolTelebingo: [],
+    mezclar: true,
+    vendedorInputs: [],
+    inicioSeneteGral: '',
+    inicioTelebingoGral: '',
+};
 
 interface ProcesoState {
     // Session data
     procesoId: string | null;
     vendedores: VendedorResponseDTO[];
     resultados: VendedorSimuladoDTO[];
+    config: ConfigState;
 
     // Current wizard step
     currentStep: number;
+
+    /**
+     * true cuando el usuario ya generó los archivos del proceso vía
+     * POST /api/distribuciones/{id}/archivos (en el backend, eso transiciona
+     * a estado COMPLETADO). Usado por /upload para NO mostrar el banner de
+     * "sesión activa" y por PdfDownloader para mostrar directamente los
+     * botones de descarga si el usuario vuelve a /resultados.
+     */
+    procesoCompletado: boolean;
 
     // Actions
     setProcesoId: (id: string) => void;
     setVendedores: (vendedores: VendedorResponseDTO[]) => void;
     setResultados: (resultados: VendedorSimuladoDTO[]) => void;
     setCurrentStep: (step: number) => void;
+    marcarProcesoCompletado: () => void;
+    /** Actualiza parcialmente la config. No pisa fields que no se pasen. */
+    patchConfig: (patch: Partial<ConfigState>) => void;
+    resetConfig: () => void;
     reset: () => void;
 }
 
@@ -23,15 +74,33 @@ const initialState = {
     procesoId: null,
     vendedores: [],
     resultados: [],
+    config: emptyConfig,
     currentStep: 1,
+    procesoCompletado: false,
 };
 
 export const useProcesoStore = create<ProcesoState>()(
     persist(
-        (set) => ({
+        (set, get) => ({
             ...initialState,
 
-            setProcesoId: (id) => set({ procesoId: id }),
+            setProcesoId: (id) => {
+                // Si arranca un proceso nuevo, descartar la config del anterior —
+                // si no, el usuario subiría un Excel distinto y vería los rangos /
+                // terminaciones del proceso previo, lo que es muy confuso.
+                const prev = get().procesoId;
+                if (prev && prev !== id) {
+                    set({
+                        procesoId: id,
+                        vendedores: [],
+                        resultados: [],
+                        config: emptyConfig,
+                        procesoCompletado: false,
+                    });
+                } else {
+                    set({ procesoId: id });
+                }
+            },
 
             setVendedores: (vendedores) => set({ vendedores }),
 
@@ -39,13 +108,31 @@ export const useProcesoStore = create<ProcesoState>()(
 
             setCurrentStep: (step) => set({ currentStep: step }),
 
-            reset: () => set(initialState),
+            marcarProcesoCompletado: () => set({ procesoCompletado: true }),
+
+            patchConfig: (patch) => set((s) => ({ config: { ...s.config, ...patch } })),
+
+            resetConfig: () => set({ config: emptyConfig }),
+
+            reset: () => {
+                // Si hay un proceso en curso que no se completó, avisamos al
+                // backend para que lo marque como ABANDONADO y deje de aparecer
+                // como SIMULADO huérfano. Fire-and-forget: si el backend está
+                // caído o devuelve 422 (proceso ya completado), no rompemos el
+                // flow del usuario — el reset local sigue adelante.
+                const { procesoId, procesoCompletado } = get();
+                if (procesoId && !procesoCompletado) {
+                    abandonarProceso(procesoId).catch(() => {});
+                }
+                set(initialState);
+            },
         }),
         {
             name: 'proceso-storage',
             partialize: (state) => ({
                 procesoId: state.procesoId,
                 currentStep: state.currentStep,
+                procesoCompletado: state.procesoCompletado,
             }),
         }
     )

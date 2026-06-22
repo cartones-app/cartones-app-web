@@ -1,0 +1,60 @@
+name: CI
+
+# Build verification + lint para el frontend Next.js.
+# Corre en GitHub-hosted ubuntu-latest (gratis, no carga el self-hosted).
+# Triggers:
+#   - PRs hacia next/develop/master → build (R1)
+#   - Pushes a next/develop → verifica que el merge resultante compila (R8)
+#
+# Vercel observa este workflow vía la integración nativa de GitHub: cuando
+# CI termina verde sobre develop, dispara el deploy a Vercel.
+# El alias staging (cartones-app-web-staging.vercel.app) se reasigna en
+# .github/workflows/staging-alias.yml — un workflow separado que corre
+# DESPUÉS de CI (workflow_run) para no bloquear a Vercel.
+
+on:
+  pull_request:
+    branches: [next, develop, master]
+  push:
+    branches: [next, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        # Lee la versión de `packageManager` en package.json — un solo lugar
+        # de verdad para la versión de pnpm en local y en CI.
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        # --frozen-lockfile: equivalente a `npm ci` — falla si el lockfile no
+        # matchea package.json (evita drift silencioso en CI).
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Test
+        # Vitest run no-watch. Antes del build para fallar rápido si hay
+        # regresiones de lógica (un build verde con tests rojos no debería
+        # llegar a Vercel).
+        run: pnpm run test
+
+      - name: Build
+        run: pnpm run build

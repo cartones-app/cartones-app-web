@@ -1,23 +1,60 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
+import { ArrowRight, ChevronRight, Clock, FileText, Loader2, RotateCcw, Tag } from "lucide-react";
 import { FileUploader } from "@/components/FileUploader";
 import { WizardStepper } from "@/components/WizardStepper";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { useProcesoStore } from "@/store/useProcesoStore";
-import { uploadExcel } from "@/lib/api";
+import {
+    descargarEtiquetas,
+    descargarResumen,
+    listarMisDistribuciones,
+    uploadExcel,
+} from "@/lib/api";
+import { formatFechaHoraCorta } from "@/lib/date-format";
+import { shortId } from "@/lib/format-id";
+import {
+    ESTADO_PROCESO_COLOR,
+    ESTADO_PROCESO_COLOR_FALLBACK,
+    normalizarEstado,
+} from "@/lib/proceso-estado";
+import { descargarPdfProceso, type DescargaTipo } from "@/lib/proceso-descarga";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RotateCcw, Sparkles } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { archivosDisponibles, type ProcesoDistribucionResumenDTO } from "@/types";
+
+const RECIENTES_LIMIT = 4;
 
 export default function UploadPage() {
     const router = useRouter();
-    const { setProcesoId, setCurrentStep, reset } = useProcesoStore();
+    const { procesoId, procesoCompletado, setProcesoId, setCurrentStep, reset } = useProcesoStore();
+
+    // Defensa contra estado persistido corrupto: hubo un período donde uploadExcel
+    // guardaba el DTO entero en lugar del string. Si detectamos eso en localStorage,
+    // lo limpiamos en el primer render para evitar que la UI explote.
+    useEffect(() => {
+        if (procesoId != null && typeof procesoId !== "string") {
+            reset();
+        }
+    }, [procesoId, reset]);
     const [isLoading, setIsLoading] = useState(false);
     const [hasError, setHasError] = useState(false);
     const selectedFileRef = useRef<File | null>(null);
+
+    const [recientes, setRecientes] = useState<ProcesoDistribucionResumenDTO[]>([]);
+    const [cargandoRecientes, setCargandoRecientes] = useState(true);
+    const [descargando, setDescargando] = useState<{ id: string; tipo: DescargaTipo } | null>(null);
+
+    useEffect(() => {
+        listarMisDistribuciones()
+            .then((data) => setRecientes(data.slice(0, RECIENTES_LIMIT)))
+            .catch(() => {})
+            .finally(() => setCargandoRecientes(false));
+    }, []);
 
     const handleUpload = async (file: File) => {
         selectedFileRef.current = file;
@@ -28,20 +65,17 @@ export default function UploadPage() {
             const procesoId = await uploadExcel(file);
             setProcesoId(procesoId);
             setCurrentStep(2);
-            toast.success("Archivo cargado exitosamente", {
-                description: `Proceso ID: ${procesoId}`,
+            toast.success("Archivo cargado", {
+                description: "Listo para configurar la distribución.",
             });
             router.push("/configuracion");
         } catch {
-            // Error is handled by axios interceptor
             setHasError(true);
             setIsLoading(false);
         }
     };
 
-    const handleFileSelect = (file: File) => {
-        handleUpload(file);
-    };
+    const handleFileSelect = (file: File) => handleUpload(file);
 
     const handleRetry = () => {
         if (selectedFileRef.current) {
@@ -56,64 +90,244 @@ export default function UploadPage() {
         toast.info("Sesión reiniciada");
     };
 
+    const handleDescargar = async (procesoId: string, tipo: DescargaTipo) => {
+        setDescargando({ id: procesoId, tipo });
+        try {
+            const fetcher = tipo === "etiquetas" ? descargarEtiquetas : descargarResumen;
+            await descargarPdfProceso(procesoId, tipo, fetcher);
+        } catch {
+            // toast global
+        } finally {
+            setDescargando(null);
+        }
+    };
+
+    const isBusy = (procesoId: string, tipo: DescargaTipo) =>
+        descargando?.id === procesoId && descargando?.tipo === tipo;
+
     return (
-        <div className="min-h-screen relative overflow-hidden">
-            {/* Background gradient */}
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-background" />
-            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-            <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-primary/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+        <div className="relative overflow-hidden">
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-background" />
+                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+                <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-primary/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+            </div>
 
-            {/* Content */}
-            <div className="relative z-10">
-                {/* Header */}
-                <header className="border-b bg-background/80 backdrop-blur-sm">
-                    <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Sparkles className="h-6 w-6 text-primary" />
-                            <h1 className="font-semibold text-lg">Gestión de Bingos</h1>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="sm" onClick={handleReset}>
-                                <RotateCcw className="h-4 w-4 mr-2" />
-                                Reiniciar
-                            </Button>
-                            <ThemeToggle />
-                        </div>
-                    </div>
-                </header>
-
-                {/* Wizard Stepper */}
-                <div className="container mx-auto px-4 pt-8">
+            <div className="relative">
+                <div className="container mx-auto px-4 pt-8 flex justify-center">
                     <WizardStepper currentStep={1} />
                 </div>
 
-                {/* Main Content */}
-                <main className="container mx-auto px-4 py-12 flex items-center justify-center">
-                    <Card className="w-full max-w-2xl border-0 shadow-xl bg-card/80 backdrop-blur-sm">
-                        <CardHeader className="text-center pb-2">
-                            <CardTitle className="text-2xl md:text-3xl font-bold">
-                                Carga de Datos
+                <main className="container mx-auto px-4 py-10 max-w-5xl">
+                    <Card className="border-0 shadow-xl bg-card/80 backdrop-blur-sm">
+                        <CardHeader className="pb-2 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                            <div className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground mb-3">
+                                <span className="inline-block w-8 h-px bg-foreground/30"></span>
+                                Paso 1 — Carga
+                            </div>
+                            <CardTitle className="font-bold tracking-tight leading-[1.05] text-[clamp(1.5rem,3vw,2.5rem)]">
+                                <span className="bg-clip-text text-transparent bg-gradient-to-br from-foreground via-foreground to-foreground/55">
+                                    Carga de datos
+                                </span>
                             </CardTitle>
-                            <CardDescription className="text-base">
-                                Sube tu archivo Excel con la información de los vendedores para comenzar
+                            <CardDescription className="text-base mt-2 max-w-xl">
+                                Subí tu archivo Excel con la información de los vendedores para comenzar.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="pt-6">
-                            <FileUploader
-                                onFileSelect={handleFileSelect}
-                                isLoading={isLoading}
-                                hasError={hasError}
-                                onRetry={handleRetry}
-                            />
+                            <div className="mx-auto max-w-2xl">
+                                {/*
+                                  Mostramos el banner de "sesión activa" solo cuando NO estamos
+                                  en medio de un upload. Si no, tras subir un Excel nuevo el flujo
+                                  es: setProcesoId → re-render con banner visible → router.push.
+                                  El banner aparece por un instante antes de navegar a /configuracion.
+                                  `isLoading` se mantiene true hasta que la página se desmonta por
+                                  la navegación, así que esta condición lo evita.
+                                  Si el proceso ya está COMPLETADO (archivos generados), tampoco
+                                  mostramos banner — el flujo terminó y queremos que el user
+                                  empiece directamente con un Excel nuevo.
+                                */}
+                                {typeof procesoId === "string" && procesoId && !isLoading && !procesoCompletado ? (
+                                    <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-5">
+                                        <div className="flex items-start gap-3">
+                                            <div className="rounded-full bg-amber-500/15 p-2">
+                                                <FileText className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="font-medium text-amber-900 dark:text-amber-200">
+                                                    Ya tenés una sesión activa
+                                                </h3>
+                                                <p className="text-sm text-amber-800/80 dark:text-amber-300/80 mt-1">
+                                                    Proceso{" "}
+                                                    <span className="font-mono">
+                                                        {shortId(procesoId)}
+                                                    </span>
+                                                    . Continuá donde la dejaste o reiniciá para
+                                                    subir otro Excel.
+                                                </p>
+                                                <div className="mt-4 flex flex-wrap gap-2">
+                                                    <Button
+                                                        onClick={() => router.push("/configuracion")}
+                                                    >
+                                                        Continuar sesión
+                                                        <ArrowRight className="h-4 w-4 ml-2" />
+                                                    </Button>
+                                                    <Button variant="outline" onClick={handleReset}>
+                                                        <RotateCcw className="h-4 w-4 mr-2" />
+                                                        Reiniciar y subir otro Excel
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <FileUploader
+                                            onFileSelect={handleFileSelect}
+                                            isLoading={isLoading}
+                                            hasError={hasError}
+                                            onRetry={handleRetry}
+                                        />
 
-                            <div className="mt-8 p-4 rounded-lg bg-muted/50 border">
-                                <h3 className="font-medium text-sm mb-2">Formato esperado del archivo:</h3>
-                                <ul className="text-sm text-muted-foreground space-y-1">
-                                    <li>• Archivo Excel (.xlsx)</li>
-                                </ul>
+                                        <div className="mt-6 p-4 rounded-lg bg-muted/50 border">
+                                            <h3 className="font-medium text-sm mb-2">
+                                                Formato esperado del archivo:
+                                            </h3>
+                                            <ul className="text-sm text-muted-foreground space-y-1">
+                                                <li>• Archivo Excel (.xlsx)</li>
+                                            </ul>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
+
+                    <section className="mt-10" aria-labelledby="recientes-heading">
+                        <div className="flex items-center justify-between mb-3">
+                            <h2
+                                id="recientes-heading"
+                                className="text-sm font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2"
+                            >
+                                <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                                Distribuciones recientes
+                            </h2>
+                            {recientes.length > 0 && (
+                                <Button variant="ghost" size="sm" asChild>
+                                    <Link href="/mis-distribuciones">
+                                        Ver todas
+                                        <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                                    </Link>
+                                </Button>
+                            )}
+                        </div>
+
+                        {cargandoRecientes ? (
+                            <div className="grid sm:grid-cols-2 gap-3">
+                                {Array.from({ length: 2 }).map((_, i) => (
+                                    <Skeleton key={i} className="h-20 rounded-lg" />
+                                ))}
+                            </div>
+                        ) : recientes.length === 0 ? (
+                            <div className="rounded-xl border border-dashed bg-card/40 p-8 text-center text-sm text-muted-foreground">
+                                Cuando generes distribuciones, vas a verlas acá para descargarlas rápido.
+                            </div>
+                        ) : (
+                            <div className="grid sm:grid-cols-2 gap-3">
+                                {recientes.map((p) => {
+                                    const disponibles = archivosDisponibles(p);
+                                    return (
+                                        <div
+                                            key={p.procesoId}
+                                            className="group rounded-lg border bg-card/80 backdrop-blur-sm p-4 flex items-center gap-3 hover:border-primary/40 hover:shadow-sm transition-all"
+                                        >
+                                            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                                <FileText className="h-4 w-4" aria-hidden="true" />
+                                            </span>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-mono text-xs text-muted-foreground truncate">
+                                                        {shortId(p.procesoId)}
+                                                    </span>
+                                                    {(() => {
+                                                        const estado = normalizarEstado(p.estado);
+                                                        return (
+                                                            <span
+                                                                className={`inline-block px-2 py-0.5 rounded text-xs border ${
+                                                                    ESTADO_PROCESO_COLOR[estado] ?? ESTADO_PROCESO_COLOR_FALLBACK
+                                                                }`}
+                                                            >
+                                                                {estado}
+                                                            </span>
+                                                        );
+                                                    })()}
+                                                    {!disponibles && (
+                                                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                                            {p.archivosBorradosEn !== null
+                                                                ? "No disponibles"
+                                                                : "Sin generar"}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="text-xs text-muted-foreground mt-0.5">
+                                                    {formatFechaHoraCorta(p.createdAt)}
+                                                </div>
+                                            </div>
+                                            <div className="inline-flex items-center gap-1">
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    disabled={!disponibles || isBusy(p.procesoId, "etiquetas")}
+                                                    onClick={() => handleDescargar(p.procesoId, "etiquetas")}
+                                                    title={
+                                                        disponibles
+                                                            ? "Descargar etiquetas (PDF)"
+                                                            : "Archivos no disponibles"
+                                                    }
+                                                    aria-label="Descargar etiquetas"
+                                                >
+                                                    {isBusy(p.procesoId, "etiquetas") ? (
+                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                    ) : (
+                                                        <Tag className="h-4 w-4" />
+                                                    )}
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    disabled={!disponibles || isBusy(p.procesoId, "resumen")}
+                                                    onClick={() => handleDescargar(p.procesoId, "resumen")}
+                                                    title={
+                                                        disponibles
+                                                            ? "Descargar resumen (PDF)"
+                                                            : "Archivos no disponibles"
+                                                    }
+                                                    aria-label="Descargar resumen"
+                                                >
+                                                    {isBusy(p.procesoId, "resumen") ? (
+                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                    ) : (
+                                                        <FileText className="h-4 w-4" />
+                                                    )}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {!cargandoRecientes && recientes.length === RECIENTES_LIMIT && (
+                            <div className="mt-3 text-center">
+                                <Button variant="ghost" size="sm" asChild>
+                                    <Link href="/mis-distribuciones">
+                                        Ver todas
+                                        <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                                    </Link>
+                                </Button>
+                            </div>
+                        )}
+                    </section>
                 </main>
             </div>
         </div>

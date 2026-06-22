@@ -3,20 +3,36 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { format } from "date-fns";
-import { Loader2, ArrowLeft, ArrowRight, Sparkles, RotateCcw } from "lucide-react";
+import { Loader2, ArrowLeft, RotateCcw } from "lucide-react";
 import { WizardStepper } from "@/components/WizardStepper";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { ConfigurationPanel } from "@/components/ConfigurationPanel";
 import { Button } from "@/components/ui/button";
 import { useProcesoStore } from "@/store/useProcesoStore";
 import { getVendedores, simularDistribucion } from "@/lib/api";
+import { dateToIsoLocal } from "@/lib/date-format";
+import { shortId } from "@/lib/format-id";
 import {
     PoolRangeForm,
     RangoCortadoDTO,
     SimulacionRequestDTO,
     VendedorInputDTO,
 } from "@/types";
+
+/**
+ * ISO 'yyyy-MM-dd' → Date en hora local. Round-trip con
+ * {@link dateToIsoLocal} es estable porque ambos lados usan el TZ del browser.
+ */
+function isoToDate(iso: string | null): Date | undefined {
+    if (!iso) return undefined;
+    const [y, m, d] = iso.split("-").map(Number);
+    if (!y || !m || !d) return undefined;
+    return new Date(y, m - 1, d);
+}
+
+/** Date → ISO 'yyyy-MM-dd' local-aware. */
+function dateToIso(d: Date | undefined): string | null {
+    return d ? dateToIsoLocal(d) : null;
+}
 
 export default function ConfiguracionPage() {
     const router = useRouter();
@@ -27,23 +43,41 @@ export default function ConfiguracionPage() {
         resultados,
         setResultados,
         setCurrentStep,
+        config,
+        patchConfig,
         reset,
     } = useProcesoStore();
 
     const [isLoading, setIsLoading] = useState(true);
     const [isSimulating, setIsSimulating] = useState(false);
-    const [hasSimulated, setHasSimulated] = useState(false);
-    const [showResultsPreview, setShowResultsPreview] = useState(false);
+    // Derivado del store: si hay resultados, ya simulamos. Evita race con la
+    // hidratación async de zustand/persist en el primer render.
+    const hasSimulated = resultados.length > 0;
+    // El user puede colapsar/expandir manualmente el preview, pero si el store
+    // se queda sin resultados (reset desde otra pestaña / sincronización), el
+    // preview no debería mostrarse "vacío con mensaje de error". Combinamos el
+    // toggle local con el length del store: visible solo cuando ambos lo
+    // permiten.
+    const [previewExpandido, setPreviewExpandido] = useState(true);
+    const showResultsPreview = previewExpandido && resultados.length > 0;
 
-    // Configuration state
-    const [fechaSorteoSenete, setFechaSorteoSenete] = useState<Date | undefined>(undefined);
-    const [fechaSorteoTelebingo, setFechaSorteoTelebingo] = useState<Date | undefined>(undefined);
-    const [poolSenete, setPoolSenete] = useState<PoolRangeForm[]>([]);
-    const [poolTelebingo, setPoolTelebingo] = useState<PoolRangeForm[]>([]);
-    const [mezclar, setMezclar] = useState(true);
-    const [vendedorInputs, setVendedorInputs] = useState<VendedorInputDTO[]>([]);
-    const [inicioSeneteGral, setInicioSeneteGral] = useState<string>("");
-    const [inicioTelebingoGral, setInicioTelebingoGral] = useState<string>("");
+    // La config vive en el store — al volver desde /resultados los rangos /
+    // terminaciones / fechas siguen ahí. Las fechas se transportan como Date
+    // hacia el panel pero se guardan ISO en el store.
+    const fechaSorteoSenete = isoToDate(config.fechaSorteoSenete);
+    const fechaSorteoTelebingo = isoToDate(config.fechaSorteoTelebingo);
+    const setFechaSorteoSenete = (d: Date | undefined) =>
+        patchConfig({ fechaSorteoSenete: dateToIso(d) });
+    const setFechaSorteoTelebingo = (d: Date | undefined) =>
+        patchConfig({ fechaSorteoTelebingo: dateToIso(d) });
+    const setPoolSenete = (poolSenete: PoolRangeForm[]) => patchConfig({ poolSenete });
+    const setPoolTelebingo = (poolTelebingo: PoolRangeForm[]) =>
+        patchConfig({ poolTelebingo });
+    const setMezclar = (mezclar: boolean) => patchConfig({ mezclar });
+    const setInicioSeneteGral = (inicioSeneteGral: string) =>
+        patchConfig({ inicioSeneteGral });
+    const setInicioTelebingoGral = (inicioTelebingoGral: string) =>
+        patchConfig({ inicioTelebingoGral });
 
     // Redirect if no procesoId
     useEffect(() => {
@@ -53,40 +87,62 @@ export default function ConfiguracionPage() {
             return;
         }
 
-        // Fetch vendedores
+        // Flag de cleanup para descartar la respuesta si el componente se
+        // desmonta (navegación a /upload, cambio de procesoId) o si el effect
+        // se re-dispara antes de que termine el fetch. Sin esto, una respuesta
+        // tardía de un procesoId viejo podría pisar `vendedores` del nuevo o
+        // re-inicializar `vendedorInputs` con datos del anterior tras un
+        // resetConfig() implícito.
+        let cancelado = false;
+
         const fetchVendedores = async () => {
             try {
                 const data = await getVendedores(procesoId);
+                if (cancelado) return;
                 setVendedores(data);
-                // Initialize vendedorInputs from the response
-                setVendedorInputs(
-                    data.map((v) => ({
-                        id: v.id,
-                        nombre: v.nombre,
-                        cantidadSenete: v.cantidadSenete,
-                        cantidadTelebingo: v.cantidadTelebingo,
-                        terminacionSenete: null,
-                        terminacionTelebingo: null,
-                    }))
-                );
+                // Solo inicializar vendedorInputs si no hay nada en el store —
+                // si el usuario ya editó terminaciones y vuelve desde /resultados,
+                // no las pisamos. Si cambió el procesoId, setProcesoId() ya hizo
+                // resetConfig() en el store, así que esto queda vacío y se hidrata.
+                const current = useProcesoStore.getState().config.vendedorInputs;
+                if (current.length === 0) {
+                    patchConfig({
+                        vendedorInputs: data.map((v) => ({
+                            id: v.id,
+                            nombre: v.nombre,
+                            cantidadSenete: v.cantidadSenete,
+                            cantidadTelebingo: v.cantidadTelebingo,
+                            terminacionSenete: null,
+                            terminacionTelebingo: null,
+                        })),
+                    });
+                }
             } catch {
                 // Error handled by axios interceptor
             } finally {
-                setIsLoading(false);
+                if (!cancelado) setIsLoading(false);
             }
         };
 
         fetchVendedores();
-    }, [procesoId, router, setVendedores]);
+
+        return () => {
+            cancelado = true;
+        };
+    }, [procesoId, router, setVendedores, patchConfig]);
 
     const handleUpdateVendedor = (
         id: number,
         field: keyof VendedorInputDTO,
         value: number | null | undefined
     ) => {
-        setVendedorInputs((prev) =>
-            prev.map((v) => (v.id === id ? { ...v, [field]: value } : v))
-        );
+        // getState() en vez del `config` del closure: este handler se pasa al
+        // panel hijo y podría ejecutarse con un `config` viejo si React no
+        // re-renderiza entre keystrokes consecutivos. Leemos siempre fresco.
+        const current = useProcesoStore.getState().config.vendedorInputs;
+        patchConfig({
+            vendedorInputs: current.map((v) => (v.id === id ? { ...v, [field]: value } : v)),
+        });
     };
 
     const handleSimular = async () => {
@@ -95,22 +151,21 @@ export default function ConfiguracionPage() {
             return ranges
                 .filter((r) => r.inicio && r.fin)
                 .map((r) => ({
-                    inicio: parseInt(r.inicio),
-                    fin: parseInt(r.fin),
+                    inicio: Number.parseInt(r.inicio),
+                    fin: Number.parseInt(r.fin),
                 }));
         };
 
         const request: SimulacionRequestDTO = {
-            poolSenete: parseRanges(poolSenete),
-            poolTelebingo: parseRanges(poolTelebingo),
-            vendedores: vendedorInputs,
-            mezclar,
-            // Send null if no date selected, not empty string
-            fechaSorteoSenete: fechaSorteoSenete ? format(fechaSorteoSenete, "yyyy-MM-dd") : null,
-            fechaSorteoTelebingo: fechaSorteoTelebingo ? format(fechaSorteoTelebingo, "yyyy-MM-dd") : null,
+            poolSenete: parseRanges(config.poolSenete),
+            poolTelebingo: parseRanges(config.poolTelebingo),
+            vendedores: config.vendedorInputs,
+            mezclar: config.mezclar,
+            fechaSorteoSenete: config.fechaSorteoSenete,
+            fechaSorteoTelebingo: config.fechaSorteoTelebingo,
             // CRITICAL: Use correct JSON keys for backend @JsonProperty mapping
-            inicioSenete: inicioSeneteGral ? parseInt(inicioSeneteGral) : 0,
-            inicioTelebingo: inicioTelebingoGral ? parseInt(inicioTelebingoGral) : 0,
+            inicioSenete: config.inicioSeneteGral ? Number.parseInt(config.inicioSeneteGral) : 0,
+            inicioTelebingo: config.inicioTelebingoGral ? Number.parseInt(config.inicioTelebingoGral) : 0,
         };
 
         setIsSimulating(true);
@@ -118,8 +173,8 @@ export default function ConfiguracionPage() {
             const resultados = await simularDistribucion(procesoId!, request);
             setResultados(resultados);
             setCurrentStep(3);
-            setHasSimulated(true);
-            setShowResultsPreview(true);
+            // hasSimulated se deriva de resultados.length, ya quedó implícito.
+            setPreviewExpandido(true);
             toast.success("Simulación completada", {
                 description: "Revisa los resultados asignados en la tabla inferior.",
             });
@@ -154,36 +209,34 @@ export default function ConfiguracionPage() {
     }
 
     return (
-        <div className="min-h-screen relative overflow-hidden">
-            {/* Background */}
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-background" />
-            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+        <div className="relative overflow-hidden">
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-background" />
+                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+            </div>
 
-            {/* Content */}
-            <div className="relative z-10">
-                {/* Header */}
-                <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-20">
-                    <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Sparkles className="h-6 w-6 text-primary" />
-                            <h1 className="font-semibold text-lg">Gestión de Bingos</h1>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground hidden sm:block">
-                                Proceso: {procesoId?.slice(0, 8)}...
-                            </span>
-                            <Button variant="ghost" size="sm" onClick={handleReset}>
-                                <RotateCcw className="h-4 w-4 mr-2" />
-                                Reiniciar
-                            </Button>
-                            <ThemeToggle />
-                        </div>
-                    </div>
-                </header>
-
-                {/* Wizard Stepper */}
-                <div className="container mx-auto px-4 pt-8">
+            <div className="relative">
+                <div className="container mx-auto px-4 pt-8 flex items-center justify-between gap-2 flex-wrap">
                     <WizardStepper currentStep={2} />
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground hidden sm:block">
+                            Proceso: {shortId(procesoId)}
+                        </span>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleReset}
+                            // Durante isSimulating la request está en flight: si el user
+                            // resetea ahora, el `setResultados` del handler (que corre
+                            // cuando vuelve la respuesta) escribe sobre el store ya
+                            // limpio, dejando el wizard en un estado inconsistente
+                            // (procesoId=null + resultados con datos del proceso anterior).
+                            disabled={isSimulating}
+                        >
+                            <RotateCcw className="h-4 w-4 mr-2" />
+                            Reiniciar
+                        </Button>
+                    </div>
                 </div>
 
                 {/* Main Content */}
@@ -193,15 +246,15 @@ export default function ConfiguracionPage() {
                         setFechaSorteoSenete={setFechaSorteoSenete}
                         fechaSorteoTelebingo={fechaSorteoTelebingo}
                         setFechaSorteoTelebingo={setFechaSorteoTelebingo}
-                        poolSenete={poolSenete}
+                        poolSenete={config.poolSenete}
                         setPoolSenete={setPoolSenete}
-                        poolTelebingo={poolTelebingo}
+                        poolTelebingo={config.poolTelebingo}
                         setPoolTelebingo={setPoolTelebingo}
-                        mezclar={mezclar}
+                        mezclar={config.mezclar}
                         setMezclar={setMezclar}
-                        inicioSeneteGral={inicioSeneteGral}
+                        inicioSeneteGral={config.inicioSeneteGral}
                         setInicioSeneteGral={setInicioSeneteGral}
-                        inicioTelebingoGral={inicioTelebingoGral}
+                        inicioTelebingoGral={config.inicioTelebingoGral}
                         setInicioTelebingoGral={setInicioTelebingoGral}
                         onSimular={handleSimular}
                         isSimulating={isSimulating}
@@ -209,16 +262,16 @@ export default function ConfiguracionPage() {
                         onVerResultados={handleVerResultados}
                         // Data Props
                         vendedores={vendedores}
-                        vendedorInputs={vendedorInputs}
+                        vendedorInputs={config.vendedorInputs}
                         onUpdateVendedor={handleUpdateVendedor}
                         resultados={resultados}
                         showResultsPreview={showResultsPreview}
-                        setShowResultsPreview={setShowResultsPreview}
+                        setShowResultsPreview={setPreviewExpandido}
                     />
 
                     {/* Action Buttons - Only Back button remains, others moved to sticky bar */}
                     <div className="pt-4">
-                        <Button variant="outline" onClick={handleBack}>
+                        <Button variant="outline" onClick={handleBack} disabled={isSimulating}>
                             <ArrowLeft className="h-4 w-4 mr-2" />
                             Volver
                         </Button>

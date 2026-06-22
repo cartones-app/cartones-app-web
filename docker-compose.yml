@@ -2,22 +2,29 @@ services:
   frontend:
     build:
       context: .
-      args:
-        # NEXT_PUBLIC_* se bakea en el bundle al build. Lo pasamos como
-        # build-arg desde el .env (que el workflow genera leyendo Variables).
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     container_name: cartones_frontend
     restart: always
     environment:
       NODE_ENV: production
       PORT: 3000
       HOSTNAME: 0.0.0.0
-    # Sin "ports:" — entra por nginx-proxy en la network externa "proxy".
+      # URL interna del backend (NO NEXT_PUBLIC_): el Next server la usa para
+      # los rewrites de /api-proxy/*. En esta network "proxy" el backend
+      # resuelve por DNS interno docker como `backend:9001`. El browser NUNCA
+      # ve esta URL — solo habla con Next en same-origin.
+      BACKEND_INTERNAL_URL: ${BACKEND_INTERNAL_URL:-http://backend:9001}
+      # NextAuth runtime — sin estos, el login OIDC no inicializa.
+      # Vienen del .env que el workflow genera leyendo GitHub Variables/Secrets.
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      AUTH_SECRET: ${AUTH_SECRET}
+      AUTH_KEYCLOAK_ID: ${AUTH_KEYCLOAK_ID}
+      AUTH_KEYCLOAK_SECRET: ${AUTH_KEYCLOAK_SECRET}
+      AUTH_KEYCLOAK_ISSUER: ${AUTH_KEYCLOAK_ISSUER}
     networks:
       - proxy
-    # Healthcheck con Node.js (la imagen es node:22-alpine — siempre lo tiene).
-    # wget --spider falla con redirect 302 de '/' → '/upload'. nc en busybox
-    # no quedó claro por qué falla. Esta es la opción más portable y rápida.
+    # Healthcheck con Node.js puro (la imagen es node:22-alpine).
+    # wget --spider falla con 302 del root; nc en busybox dio resultados
+    # raros. createConnection es la opción más portable.
     healthcheck:
       test: ["CMD", "node", "-e", "require('net').createConnection(3000,'localhost').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
       interval: 20s
