@@ -25,9 +25,6 @@ services:
       AUTH_KEYCLOAK_ID: ${AUTH_KEYCLOAK_ID}
       AUTH_KEYCLOAK_SECRET: ${AUTH_KEYCLOAK_SECRET}
       AUTH_KEYCLOAK_ISSUER: ${AUTH_KEYCLOAK_ISSUER}
-      # Backchannel server-to-server hacia Keycloak por DNS interno docker
-      # (evita el hairpin VPS->Cloudflare->VPS en token/jwks/refresh).
-      KC_INTERNAL_ORIGIN: ${KC_INTERNAL_ORIGIN:-http://keycloak:8080}
     networks:
       - proxy
     # Healthcheck con Node.js puro (la imagen es node:22-alpine).
