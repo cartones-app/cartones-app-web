@@ -1,6 +1,41 @@
-import NextAuth from "next-auth";
+import NextAuth, { customFetch } from "next-auth";
 import Keycloak from "next-auth/providers/keycloak";
 import type { JWT } from "next-auth/jwt";
+
+/**
+ * Backchannel interno: el server de Next habla con Keycloak server-to-server
+ * (discovery, token, userinfo, jwks, refresh). Si esas llamadas usan la URL
+ * pública (https://keycloak.eliasg.uk), salen de la VPS hacia Cloudflare y
+ * vuelven a entrar (hairpin): ~250ms extra por login/refresh y dependencia del
+ * tunnel en el camino crítico. Reescribimos solo el DESTINO del fetch al DNS
+ * interno de docker (http://keycloak:8080); NO tocamos issuer/iss/jwks_uri, así
+ * que la validación de firma e `iss` se mantiene contra la URL pública.
+ *
+ * La URL de `authorization` (redirect del browser) NO pasa por customFetch
+ * ni por doRefresh, por lo que sigue siendo la pública.
+ */
+const KC_INTERNAL_ORIGIN = process.env.KC_INTERNAL_ORIGIN ?? "http://keycloak:8080";
+
+function kcPublicOrigin(): string {
+  try {
+    return new URL(process.env.AUTH_KEYCLOAK_ISSUER ?? "").origin;
+  } catch {
+    return "";
+  }
+}
+
+function toInternalUrl(url: string): string {
+  const pub = kcPublicOrigin();
+  return pub && url.startsWith(pub) ? KC_INTERNAL_ORIGIN + url.slice(pub.length) : url;
+}
+
+const backchannelFetch: typeof fetch = (input, init) => {
+  if (typeof input === "string") return fetch(toInternalUrl(input), init);
+  if (input instanceof URL) return fetch(toInternalUrl(input.toString()), init);
+  const req = input as Request;
+  const rewritten = toInternalUrl(req.url);
+  return rewritten === req.url ? fetch(req, init) : fetch(new Request(rewritten, req), init);
+};
 
 
 /**
@@ -87,7 +122,7 @@ async function doRefresh(token: JWT): Promise<JWT> {
   }
   try {
     const response = await fetch(
-      `${process.env.AUTH_KEYCLOAK_ISSUER}/protocol/openid-connect/token`,
+      toInternalUrl(`${process.env.AUTH_KEYCLOAK_ISSUER}/protocol/openid-connect/token`),
       {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -190,6 +225,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       clientId: process.env.AUTH_KEYCLOAK_ID,
       clientSecret: process.env.AUTH_KEYCLOAK_SECRET,
       issuer: process.env.AUTH_KEYCLOAK_ISSUER,
+      // Reescribe el backchannel (discovery/token/userinfo/jwks) al host interno
+      // docker, evitando el hairpin por Cloudflare. issuer/iss/jwks_uri siguen
+      // públicos => validación de firma e `iss` intacta.
+      [customFetch]: backchannelFetch,
     }),
   ],
   session: { strategy: "jwt" },
